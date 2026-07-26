@@ -13,6 +13,7 @@ import (
 	"log/slog"
 
 	"github.com/boxify/api-go/internal/config"
+	"github.com/boxify/api-go/internal/core/agent/harness"
 	corereact "github.com/boxify/api-go/internal/core/agent/react"
 	corecontext "github.com/boxify/api-go/internal/core/context"
 	"github.com/boxify/api-go/internal/core/llm"
@@ -186,7 +187,14 @@ func (o *Orchestrator) generate(ctx context.Context, input Input, events chan<- 
 	if contextManager != nil {
 		options = append(options, corereact.WithMessagePreparer(contextManager))
 	}
-	result, err := corereact.New(client, registry, options...).Run(runCtx, corereact.Input{
+	// 企业级 Harness 默认接管运行（可靠性/治理/可观测），config 关闭时回退到裸 react.Agent。
+	var engine chatEngine
+	if hc := o.svcCtx.Config.Agent.Harness; hc.Enabled {
+		engine = harness.New(client, registry, harnessOptions(hc, hooks, input.Temperature, input.SystemPrompt, contextManager)...)
+	} else {
+		engine = corereact.New(client, registry, options...)
+	}
+	result, err := engine.Run(runCtx, corereact.Input{
 		Query:    composeQuery(input.Message, input.Attachments),
 		Messages: historyMessages,
 	})

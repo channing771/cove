@@ -85,6 +85,15 @@ func WithUserHooks(hooks corereact.Hooks) Option {
 	}
 }
 
+// WithMessagePreparer 注入每轮模型调用前的消息规整器（如上下文管理）。
+func WithMessagePreparer(preparer corereact.MessagePreparer) Option {
+	return func(h *Harness) {
+		if preparer != nil {
+			h.messagePreparer = preparer
+		}
+	}
+}
+
 // WithSystemPrompt 设置注入 react Agent 的系统提示词。
 func WithSystemPrompt(prompt string) Option {
 	return func(h *Harness) { h.systemPrompt = prompt }

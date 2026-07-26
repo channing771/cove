@@ -125,7 +125,23 @@ type MemoryConfig struct {
 }
 
 type AgentConfig struct {
-	MaxPersona int `yaml:"max_personas"`
+	MaxPersona int           `yaml:"max_personas"`
+	Harness    HarnessConfig `yaml:"harness"`
+}
+
+// HarnessConfig 控制企业级 Agent Harness 的可靠性与治理护栏。
+//
+// 时长字段使用毫秒整数；0 表示关闭/不限制该维度。Enabled 为 false 时聊天回退到裸 react.Agent。
+type HarnessConfig struct {
+	Enabled          bool  `yaml:"enabled"`
+	RetryMaxAttempts int   `yaml:"retry_max_attempts"`
+	RetryBaseMs      int   `yaml:"retry_base_ms"`
+	TimeoutMs        int   `yaml:"timeout_ms"`
+	BreakerFailures  int   `yaml:"breaker_failures"`
+	BreakerOpenMs    int   `yaml:"breaker_open_ms"`
+	MaxTotalTokens   int64 `yaml:"max_total_tokens"`
+	MaxToolCalls     int   `yaml:"max_tool_calls"`
+	WallClockMs      int   `yaml:"wall_clock_ms"`
 }
 
 type SkillConfig struct {
@@ -231,6 +247,16 @@ func defaultConfig() Config {
 		},
 		Agent: AgentConfig{
 			MaxPersona: 200,
+			Harness: HarnessConfig{
+				Enabled:          true,
+				RetryMaxAttempts: 3,
+				RetryBaseMs:      200,
+				TimeoutMs:        60000,
+				BreakerFailures:  5,
+				BreakerOpenMs:    30000,
+				MaxToolCalls:     20,
+				WallClockMs:      120000,
+			},
 		},
 		Skill: SkillConfig{
 			MaxCount: 200,

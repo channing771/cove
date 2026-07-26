@@ -29,10 +29,11 @@ type Harness struct {
 	tracer         Tracer
 	determinism    DeterminismMode
 	cassettePath   string
-	userHooks      corereact.Hooks
-	systemPrompt   string
-	modelOptions   []llm.ModelCallOption
-	maxIterations  int
+	userHooks       corereact.Hooks
+	messagePreparer corereact.MessagePreparer
+	systemPrompt    string
+	modelOptions    []llm.ModelCallOption
+	maxIterations   int
 }
 
 // New 创建 Harness。client 为底层模型客户端，registry 为业务工具注册表。
@@ -152,6 +153,9 @@ func (h *Harness) reactOptions(hooks corereact.Hooks) []corereact.Option {
 	}
 	if h.maxIterations > 0 {
 		opts = append(opts, corereact.WithMaxIterations(h.maxIterations))
+	}
+	if h.messagePreparer != nil {
+		opts = append(opts, corereact.WithMessagePreparer(h.messagePreparer))
 	}
 	return opts
 }
