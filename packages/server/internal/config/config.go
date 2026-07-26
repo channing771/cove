@@ -29,6 +29,29 @@ type Config struct {
 	Skill         SkillConfig         `yaml:"skill"`
 	MCP           MCPConfig           `yaml:"mcp"`
 	Gateway       GatewayConfig       `yaml:"gateway"`
+	Observability ObservabilityConfig `yaml:"observability"`
+}
+
+// ObservabilityConfig 汇总可观测后端接入配置。
+type ObservabilityConfig struct {
+	OTel OTelConfig `yaml:"otel"`
+}
+
+// OTelConfig 控制 OpenTelemetry 埋点与 OTLP 导出。
+//
+// TracesEndpoint 为完整 OTLP/HTTP traces URL（如 Langfuse 的
+// http://localhost:3000/api/public/otel/v1/traces）。TracesHeaders 为逗号分隔的
+// "Key=Value" 头（如 "Authorization=Basic <base64(pk:sk)>"）。MetricsEndpoint 留空则
+// 不导出指标（Langfuse 不摄取指标）。Enabled 为 false 时全部退化为 noop，不影响现有部署。
+type OTelConfig struct {
+	Enabled         bool    `yaml:"enabled"`
+	ServiceName     string  `yaml:"service_name"`
+	TracesEndpoint  string  `yaml:"traces_endpoint"`
+	TracesHeaders   string  `yaml:"traces_headers"`
+	MetricsEndpoint string  `yaml:"metrics_endpoint"`
+	MetricsHeaders  string  `yaml:"metrics_headers"`
+	SampleRatio     float64 `yaml:"sample_ratio"`
+	Insecure        bool    `yaml:"insecure"`
 }
 
 type AppConfig struct {
@@ -261,6 +284,13 @@ func defaultConfig() Config {
 		Skill: SkillConfig{
 			MaxCount: 200,
 		},
+		Observability: ObservabilityConfig{
+			OTel: OTelConfig{
+				Enabled:     false,
+				ServiceName: "cove-api",
+				SampleRatio: 1,
+			},
+		},
 		MCP: MCPConfig{
 			ToolsCacheTTL:       "5m",
 			DiscoverTimeout:     "5s",
@@ -338,6 +368,14 @@ func applyEnv(cfg *Config) {
 	cfg.Gateway.CallbackTimeout = env("GATEWAY_CALLBACK_TIMEOUT", cfg.Gateway.CallbackTimeout)
 	cfg.Gateway.MaxRequestBytes = envInt64("GATEWAY_MAX_REQUEST_BYTES", cfg.Gateway.MaxRequestBytes)
 	cfg.Gateway.MaxMediaBytes = envInt64("GATEWAY_MAX_MEDIA_BYTES", cfg.Gateway.MaxMediaBytes)
+	cfg.Observability.OTel.Enabled = envBool("OTEL_ENABLED", cfg.Observability.OTel.Enabled)
+	cfg.Observability.OTel.ServiceName = env("OTEL_SERVICE_NAME", cfg.Observability.OTel.ServiceName)
+	cfg.Observability.OTel.TracesEndpoint = env("OTEL_TRACES_ENDPOINT", cfg.Observability.OTel.TracesEndpoint)
+	cfg.Observability.OTel.TracesHeaders = env("OTEL_TRACES_HEADERS", cfg.Observability.OTel.TracesHeaders)
+	cfg.Observability.OTel.MetricsEndpoint = env("OTEL_METRICS_ENDPOINT", cfg.Observability.OTel.MetricsEndpoint)
+	cfg.Observability.OTel.MetricsHeaders = env("OTEL_METRICS_HEADERS", cfg.Observability.OTel.MetricsHeaders)
+	cfg.Observability.OTel.SampleRatio = envFloat64("OTEL_SAMPLE_RATIO", cfg.Observability.OTel.SampleRatio)
+	cfg.Observability.OTel.Insecure = envBool("OTEL_INSECURE", cfg.Observability.OTel.Insecure)
 }
 
 func env(key, fallback string) string {
@@ -378,6 +416,18 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envFloat64(key string, fallback float64) float64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil {
 		return fallback
 	}
