@@ -15,11 +15,12 @@ import (
 
 // Manager 负责评估上下文预算、更新滚动摘要并执行最终裁剪。
 type Manager struct {
-	policy     *Policy
-	counter    Counter
-	llmClient  llm.Client
-	summarizer Summarizer
-	store      Store
+	policy      *Policy
+	counter     Counter
+	llmClient   llm.Client
+	summarizer  Summarizer
+	store       Store
+	fingerprint string
 }
 
 // NewManager 创建具备完整默认依赖的上下文管理器。
@@ -51,6 +52,10 @@ func NewManager(opts ...Option) (*Manager, error) {
 	if err := manager.policy.Validate(); err != nil {
 		return nil, err
 	}
+	// 策略构造后不可变，指纹只需计算一次，后续直接复用。
+	data, _ := json.Marshal(manager.policy)
+	sum := sha256.Sum256(data)
+	manager.fingerprint = hex.EncodeToString(sum[:])
 	return manager, nil
 }
 
@@ -218,10 +223,9 @@ func (m *Manager) fallback(messages []*llm.Message, fixedTokens int, before int)
 }
 
 // policyFingerprint 返回当前策略的 SHA256 摘要，用于判断摘要状态是否兼容。
+// 指纹在 NewManager 中一次性算好；策略不可变，故此处直接返回缓存值。
 func (m *Manager) policyFingerprint() string {
-	data, _ := json.Marshal(m.policy)
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:])
+	return m.fingerprint
 }
 
 // normalizeState 检查摘要状态是否与当前策略兼容，并返回可用的游标。

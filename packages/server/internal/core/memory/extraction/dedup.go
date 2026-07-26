@@ -148,7 +148,7 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 		// 避免 LLM 非确定性判定把同名实体反复判为不同而重复建节点
 		normName := strings.ToLower(strings.TrimSpace(entity.Name))
 		exactIdx := slices.IndexFunc(existing, func(node *memory.EntityNode) bool {
-			return node.Name == normName
+			return strings.ToLower(strings.TrimSpace(node.Name)) == normName
 		})
 
 		// 同类型同名 直接复用
@@ -166,6 +166,7 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 		// 找到图中最相似的实体
 		var bestEntity *memory.EntityNode
 		bestScore := 0.0
+		bestTxt, bestEmb := 0.0, 0.0
 		for _, existEntity := range existing {
 			txt := util.TextSim(entity.Name, existEntity.Name)
 			emb := util.Cosine(entity.NameEmbedding, existEntity.NameEmbedding)
@@ -173,6 +174,7 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 			score := max(txt, emb)
 			if (score >= o.c.Memory.NameSimGate || con) && score > bestScore {
 				bestEntity, bestScore = existEntity, score
+				bestTxt, bestEmb = txt, emb
 			}
 		}
 
@@ -182,8 +184,8 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 			continue
 		}
 
-		txt := util.Round(bestScore, 3)
-		emb := util.Round(bestScore, 3)
+		txt := util.Round(bestTxt, 3)
+		emb := util.Round(bestEmb, 3)
 		con := util.Contains(entity.Name, bestEntity.Name)
 		decision, err := o.judgeSameByLLM(ctx, bestEntity, entity, txt, emb, con)
 		if err != nil {

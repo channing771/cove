@@ -235,7 +235,7 @@ func (o *MemoryOrchestrator) RunExtraction(ctx context.Context, text string, sou
 	}
 
 	// 实体 name 向量化
-	embeddingTexts := make([]string, len(entityPool))
+	embeddingTexts := make([]string, 0, len(entityPool))
 	for _, entity := range entityPool {
 		embeddingTexts = append(embeddingTexts, entity.Name)
 	}
@@ -252,6 +252,9 @@ func (o *MemoryOrchestrator) RunExtraction(ctx context.Context, text string, sou
 
 	// 去重
 	finalEntities, resolve, err := o.dedup(ctx, entityPool)
+	if err != nil {
+		return nil, err
+	}
 
 	finalById := make(map[string]*memory.EntityNode, len(finalEntities))
 	finalEntityIDs := make([]string, 0, len(finalEntities))

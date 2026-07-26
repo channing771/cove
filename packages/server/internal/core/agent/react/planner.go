@@ -114,6 +114,10 @@ func (p *ReActTextPlanner) planStreamTrace(ctx context.Context, state State, emi
 	if err != nil {
 		return plannerResult{}, err
 	}
+	// 派生可取消 ctx: 任何提前返回(emit 出错等)都会 cancel，
+	// 唤醒阻塞在 ch<-event 上的生产者 goroutine，避免其永久泄漏。
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	events, err := streamClient.StreamEvents(ctx, messages, opts...)
 	if err != nil {
 		return plannerResult{}, err
@@ -243,6 +247,9 @@ func (p *FunctionCallingPlanner) planStreamTrace(ctx context.Context, state Stat
 	if len(state.Tools) > 0 {
 		callOpts = append(callOpts, llm.WithTools(state.Tools...))
 	}
+	// 派生可取消 ctx: 任何提前返回都会 cancel，唤醒阻塞的生产者 goroutine，避免泄漏。
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	events, err := streamClient.StreamWithTools(ctx, messages, callOpts...)
 	if err != nil {
 		return plannerResult{}, err

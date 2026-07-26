@@ -84,15 +84,17 @@ func (d ProviderDescriptor) Validate() error {
 		return errors.New("provider max text length must be positive")
 	}
 	seen := make(map[string]struct{}, len(d.CredentialFields)+len(d.SettingFields))
-	for _, field := range append(append([]FieldDescriptor(nil), d.CredentialFields...), d.SettingFields...) {
-		key := strings.TrimSpace(field.Key)
-		if key == "" {
-			return errors.New("provider field key is required")
+	for _, list := range [][]FieldDescriptor{d.CredentialFields, d.SettingFields} {
+		for _, field := range list {
+			key := strings.TrimSpace(field.Key)
+			if key == "" {
+				return errors.New("provider field key is required")
+			}
+			if _, ok := seen[key]; ok {
+				return fmt.Errorf("provider field %q is duplicated", key)
+			}
+			seen[key] = struct{}{}
 		}
-		if _, ok := seen[key]; ok {
-			return fmt.Errorf("provider field %q is duplicated", key)
-		}
-		seen[key] = struct{}{}
 	}
 	return nil
 }

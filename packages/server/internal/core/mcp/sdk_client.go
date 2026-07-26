@@ -157,9 +157,14 @@ func (c *SDKToolClient) transport(server ServerConfig) (sdkmcp.Transport, error)
 }
 
 func (c *SDKToolClient) authHTTPClient(server ServerConfig) *http.Client {
-	base := defaultHTTPClient()
-	if c != nil && c.httpClient != nil {
+	// 常规路径 c.httpClient 已存在，只有缺失时才构造默认 client，
+	// 避免每次 OpenSession/ListTools 都克隆一次 transport + Dialer 后丢弃。
+	var base *http.Client
+	if c != nil {
 		base = c.httpClient
+	}
+	if base == nil {
+		base = defaultHTTPClient()
 	}
 	headers := map[string]string{}
 	switch server.AuthType {

@@ -326,7 +326,7 @@ func TestSearcherFusesScoresAndDecodesSource(t *testing.T) {
 			hit("bm-only", 20, source("bm only", "")),
 			hit("both", 10, childSrc),
 		),
-		hitsResponse(hit("parent-both-hit", 1, map[string]any{"content": "parent content", "doc_name": "ParentDoc"})),
+		hitsResponse(hit("parent-both-hit", 1, map[string]any{"chunk_id": "parent-both", "content": "parent content", "doc_name": "ParentDoc"})),
 	}}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 

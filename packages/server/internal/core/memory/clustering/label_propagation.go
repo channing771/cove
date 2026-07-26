@@ -35,7 +35,6 @@ import (
 type LabelPropagationEngine struct {
 	log           *slog.Logger
 	c             *config.Config
-	userId        string
 	id            id.Generator
 	llm           llm.Client
 	prompt        memory.Prompter
@@ -64,7 +63,7 @@ func NewLabelPropagationEngine(config *config.Config, idGenerator id.Generator, 
 func (e *LabelPropagationEngine) Invoke(ctx context.Context, userId string) error {
 	e.log.InfoContext(ctx, "开始标签传播")
 
-	hasCommunities, err := e.communityRepo.HasCommunities(ctx, e.userId)
+	hasCommunities, err := e.communityRepo.HasCommunities(ctx, userId)
 	if err != nil {
 		return xerr.Wrapf(err, "查询用户是否存在社区失败")
 	}
@@ -260,10 +259,13 @@ func (e *LabelPropagationEngine) mergeCommunities(ctx context.Context, userId st
 	mergeInfo := make(map[string]string)
 
 	root := func(x string) string {
-		for v, ok := mergeInfo[x]; ok; {
+		for {
+			v, ok := mergeInfo[x]
+			if !ok {
+				return x
+			}
 			x = v
 		}
-		return x
 	}
 
 	needRefreshCommunities := make([]string, 0)
@@ -314,9 +316,11 @@ func (e *LabelPropagationEngine) mergeCommunities(ctx context.Context, userId st
 		return nil, err
 	}
 
-	finalCommunities := make([]string, 0)
-	for _, cid := range mergeInfo {
-		if _, exist := mergeInfo[cid]; !exist {
+	// 幸存社区 = 输入社区中未被解散(未作为 key 写入 mergeInfo)的那些。
+	// 直接遍历输入列表，保证未参与合并的社区不会被漏掉。
+	finalCommunities := make([]string, 0, len(communityIds))
+	for _, cid := range communityIds {
+		if _, dissolved := mergeInfo[cid]; !dissolved {
 			finalCommunities = append(finalCommunities, cid)
 		}
 	}

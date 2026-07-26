@@ -27,9 +27,8 @@ func cloneSteps(steps []Step) []Step {
 		return nil
 	}
 	out := make([]Step, len(steps))
-	copy(out, steps)
-	for i := range out {
-		out[i] = cloneStep(out[i])
+	for i := range steps {
+		out[i] = cloneStep(steps[i])
 	}
 	return out
 }

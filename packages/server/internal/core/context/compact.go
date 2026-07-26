@@ -15,29 +15,39 @@ func (m *Manager) fitMessages(messages []*llm.Message, fixedTokens int, targetTo
 	blocks := groupMessages(messages)
 	compacted := false
 
+	// countBlocks 需要对全部消息做序列化 + BPE 编码，代价较高，
+	// 因此只在实际改动 blocks 后才重新计数，避免每轮循环重复全量分词(O(n^2))。
+	total := fixedTokens + m.countBlocks(blocks)
+
 	// 优先清空较旧工具结果，保留工具调用关系但避免大段 Observation 挤占窗口。
-	for index := 0; index < len(blocks)-1 && fixedTokens+m.countBlocks(blocks) > targetTokens; index++ {
+	for index := 0; index < len(blocks)-1 && total > targetTokens; index++ {
 		if !blocks[index].tool {
 			continue
 		}
+		mutated := false
 		for _, message := range blocks[index].messages {
 			// 仅清空工具结果消息的内容，保留工具调用消息和工具结果的关系。
 			// 内容为空的工具结果消息不会被重复清空。
 			if message.Role == llm.ToolRole && message.Content != "" {
 				message.Content = "[tool result omitted]"
 				compacted = true
+				mutated = true
 			}
+		}
+		if mutated {
+			total = fixedTokens + m.countBlocks(blocks)
 		}
 	}
 
 	// 再从最旧的可裁剪消息块开始删除；system 与最后一个消息块始终保留。
-	for index := 0; index < len(blocks)-1 && fixedTokens+m.countBlocks(blocks) > targetTokens; {
+	for index := 0; index < len(blocks)-1 && total > targetTokens; {
 		if blocks[index].pinned {
 			index++
 			continue
 		}
 		blocks = append(blocks[:index], blocks[index+1:]...)
 		compacted = true
+		total = fixedTokens + m.countBlocks(blocks)
 	}
 	return flattenBlocks(blocks), compacted
 }
@@ -79,7 +89,11 @@ func groupMessages(messages []*llm.Message) []messageBlock {
 
 // flattenBlocks 将 messageBlock 列表展开为消息列表。
 func flattenBlocks(blocks []messageBlock) []*llm.Message {
-	var messages []*llm.Message
+	total := 0
+	for _, block := range blocks {
+		total += len(block.messages)
+	}
+	messages := make([]*llm.Message, 0, total)
 	for _, block := range blocks {
 		messages = append(messages, block.messages...)
 	}

@@ -140,19 +140,25 @@ func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOpt
 
 // resultsForIDs 组装检索结果；命中 child 时优先返回 parent 内容，给上层提供更完整上下文。
 func (s *Searcher[T]) resultsForIDs(ctx context.Context, ids []string, hits map[string]map[string]any, scores map[string]float64, rerankScores map[string]float64) ([]Output[T], error) {
+	// 一次性批量拉取所有命中 child 的 parent 内容，避免逐条 ES 往返(N+1)。
+	parentContents := s.fetchParentContents(ctx, ids, hits)
+
 	results := make([]Output[T], 0, len(ids))
 	for _, id := range ids {
 		src := hits[id]
-		content, err := s.resolveParentContent(ctx, src)
-		if err != nil {
-			content = valuex.String(src["content"])
+		content := valuex.String(src["content"])
+		if parentID := valuex.String(src["parent_id"]); parentID != "" {
+			if parentContent := parentContents[parentID]; parentContent != "" {
+				content = parentContent
+			}
 		}
 		var source T
 		if s.sourceDecoder != nil {
-			source, err = s.sourceDecoder(src)
+			decoded, err := s.sourceDecoder(src)
 			if err != nil {
 				return nil, err
 			}
+			source = decoded
 		}
 		var rerankScore *float64
 		if score, ok := rerankScores[id]; ok {
@@ -253,35 +259,50 @@ func belowThreshold(score float64, threshold *float64) bool {
 	return threshold != nil && score < *threshold
 }
 
-// resolveParentContent 查询 parent chunk 内容；业务隔离过滤由外层调用方负责提供。
-func (s *Searcher[T]) resolveParentContent(ctx context.Context, src map[string]any) (string, error) {
-	parentID := valuex.String(src["parent_id"])
-	if parentID == "" {
-		return valuex.String(src["content"]), nil
+// fetchParentContents 批量查询命中 child 的 parent chunk 内容，返回 parentID → content。
+//
+// 用一次 terms 查询取回全部 parent，取代此前每个结果一次 ES 往返的 N+1 模式；
+// 查询失败时返回 nil（调用方回退到 child 自身内容），保持原有 fail-soft 行为。
+// 业务隔离过滤由外层调用方负责提供。
+func (s *Searcher[T]) fetchParentContents(ctx context.Context, ids []string, hits map[string]map[string]any) map[string]string {
+	parentIDSet := make(map[string]struct{})
+	for _, id := range ids {
+		if parentID := valuex.String(hits[id]["parent_id"]); parentID != "" {
+			parentIDSet[parentID] = struct{}{}
+		}
+	}
+	if len(parentIDSet) == 0 {
+		return nil
+	}
+
+	parentIDs := make([]any, 0, len(parentIDSet))
+	for parentID := range parentIDSet {
+		parentIDs = append(parentIDs, parentID)
 	}
 	resp, err := s.es.Search(ctx, s.Index, map[string]any{
-		"size": 1,
+		"size": len(parentIDs),
 		"query": map[string]any{
 			"bool": map[string]any{
 				"filter": []any{
-					map[string]any{"term": map[string]any{"chunk_id": parentID}},
+					map[string]any{"terms": map[string]any{"chunk_id": parentIDs}},
 				},
 			},
 		},
 	})
 	if err != nil {
-		return "", err
+		return nil
 	}
-	hits := responseHits(resp)
-	if len(hits) == 0 {
-		return valuex.String(src["content"]), nil
+
+	contents := make(map[string]string, len(parentIDs))
+	for _, hit := range responseHits(resp) {
+		parentSrc, _ := hit["_source"].(map[string]any)
+		chunkID := valuex.String(parentSrc["chunk_id"])
+		if chunkID == "" {
+			continue
+		}
+		contents[chunkID] = valuex.String(parentSrc["content"])
 	}
-	parentSrc, _ := hits[0]["_source"].(map[string]any)
-	content := valuex.String(parentSrc["content"])
-	if content == "" {
-		return valuex.String(src["content"]), nil
-	}
-	return content, nil
+	return contents
 }
 
 // filterByMinVectorScore 使用 ES cosine 原始相关度过滤候选。
