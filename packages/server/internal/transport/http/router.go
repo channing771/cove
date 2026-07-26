@@ -25,6 +25,18 @@ type Dependencies struct {
 	EnableDebugPanicRoute bool
 }
 
+// maxRequestBodyBytes 限制单个请求体大小：足以覆盖最大 50MB 上传，
+// 同时挡住超大 body 造成的内存/磁盘/连接耗尽(DoS)。
+const maxRequestBodyBytes = 64 << 20
+
+// limitRequestBody 在读取前就把请求体封顶，超限时后续读取立即报错。
+func limitRequestBody(maxBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		c.Next()
+	}
+}
+
 func NewRouter(deps Dependencies) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	response.RegisterValidatorTagNames()
@@ -33,6 +45,7 @@ func NewRouter(deps Dependencies) *gin.Engine {
 	r.Use(xlog.RecoveryMiddleware())
 	r.Use(xlog.GinMiddleware())
 	r.Use(cors())
+	r.Use(limitRequestBody(maxRequestBodyBytes))
 	r.NoRoute(func(c *gin.Context) {
 		response.FromError(c, xerr.NotFound("route not found"))
 	})
