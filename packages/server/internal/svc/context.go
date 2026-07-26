@@ -21,6 +21,7 @@ import (
 	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
 	dbneo4j "github.com/boxify/api-go/internal/infrastructure/db/neo4j"
 	dbpostgres "github.com/boxify/api-go/internal/infrastructure/db/postgres"
+	infraqdrant "github.com/boxify/api-go/internal/infrastructure/db/qdrant"
 	infraredis "github.com/boxify/api-go/internal/infrastructure/db/redis"
 	infrallm "github.com/boxify/api-go/internal/infrastructure/llm"
 	"github.com/boxify/api-go/internal/infrastructure/queue"
@@ -33,9 +34,9 @@ import (
 	appprompts "github.com/boxify/api-go/internal/prompts"
 	"github.com/boxify/api-go/internal/prompts/promptsgen"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
 	"github.com/boxify/api-go/internal/repository/graph"
 	repositorypostgres "github.com/boxify/api-go/internal/repository/postgres"
+	repositoryragchunk "github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/xerr"
 	"gorm.io/gorm"
 )
@@ -168,11 +169,24 @@ func New(ctx context.Context, cfg config.Config) (*ServiceContext, error) {
 		return nil, err
 	}
 	svcCtx.Elasticsearch = esClient
-	ragChunkRepo := repositoryes.NewRAGChunkRepository(esClient, cfg.Rag.ChunkIndex)
+
+	// 稠密向量走 Qdrant，关键词/BM25 走 Elasticsearch；core 检索层只依赖中立端口。
+	keywordIndex := infraes.NewKeywordIndex(esClient, cfg.Rag.ChunkIndex)
+	denseIndex, err := infraqdrant.NewDenseIndex(
+		cfg.Qdrant.Addr,
+		cfg.Qdrant.APIKey,
+		cfg.Qdrant.UseTLS,
+		cfg.Qdrant.Collection,
+	)
+	if err != nil {
+		_ = svcCtx.Close(ctx)
+		return nil, err
+	}
+	ragChunkRepo := repositoryragchunk.NewRepository(denseIndex, keywordIndex)
 	svcCtx.RAGChunkRepo = ragChunkRepo
 	svcCtx.RAGSearcher = ragsearch.NewSearcher[models.RAGChunkSource](
-		esClient,
-		ragsearch.WithIndex(cfg.Rag.ChunkIndex),
+		denseIndex,
+		keywordIndex,
 		ragsearch.WithEmbeddingDim(cfg.Rag.EmbeddingDim),
 		ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource),
 	)

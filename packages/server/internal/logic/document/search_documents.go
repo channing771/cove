@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/observability/xlog"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/transport/http/request"
@@ -70,8 +71,8 @@ func (l *SearchDocumentsLogic) SearchDocuments(userID uuid.UUID, input *request.
 	return &response.ListResponse[*response.SearchDocumentResponse]{List: out}, nil
 }
 
-func documentSearchFilters(userID uuid.UUID, tags []string) []any {
-	filters := []any{map[string]any{"term": map[string]any{"user_id": userID.String()}}}
+func documentSearchFilters(userID uuid.UUID, tags []string) vectorstore.Filter {
+	conditions := []vectorstore.Condition{vectorstore.Eq("user_id", userID.String())}
 	cleanTags := make([]string, 0, len(tags))
 	for _, tag := range tags {
 		if value := strings.TrimSpace(tag); value != "" {
@@ -79,7 +80,7 @@ func documentSearchFilters(userID uuid.UUID, tags []string) []any {
 		}
 	}
 	if len(cleanTags) != 0 {
-		filters = append(filters, map[string]any{"terms": map[string]any{"tags": cleanTags}})
+		conditions = append(conditions, vectorstore.In("tags", cleanTags))
 	}
-	return filters
+	return vectorstore.Filter{Must: conditions}
 }

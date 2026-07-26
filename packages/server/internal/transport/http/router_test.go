@@ -26,6 +26,7 @@ import (
 	domainskills "github.com/boxify/api-go/internal/domain/skills"
 	"github.com/boxify/api-go/internal/domain/types"
 	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/queue"
 	"github.com/boxify/api-go/internal/infrastructure/realtime"
 	"github.com/boxify/api-go/internal/infrastructure/security"
@@ -33,7 +34,7 @@ import (
 	appprompts "github.com/boxify/api-go/internal/prompts"
 	"github.com/boxify/api-go/internal/prompts/promptsgen"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
+	"github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/svc"
 	httptransport "github.com/boxify/api-go/internal/transport/http"
 	"github.com/boxify/api-go/internal/xerr"
@@ -98,7 +99,8 @@ func newTestRouterWithConfigAndOverrides(t *testing.T, cfg config.Config, config
 	if err != nil {
 		t.Fatalf("new es client: %v", err)
 	}
-	ragChunkRepo := repositoryes.NewRAGChunkRepository(esClient, cfg.Rag.ChunkIndex)
+	mem := memory.New()
+	ragChunkRepo := ragchunk.NewRepository(mem.Dense(), mem.Keyword())
 	llmManager := newTestLLMManager()
 	modelConfigRepo := &testModelConfigRepository{}
 	promptManager := prompt.NewManager()
@@ -126,7 +128,7 @@ func newTestRouterWithConfigAndOverrides(t *testing.T, cfg config.Config, config
 		Storage:           newTestDocumentStore(),
 		Elasticsearch:     esClient,
 		RAGChunkRepo:      ragChunkRepo,
-		RAGSearcher:       ragsearch.NewSearcher[models.RAGChunkSource](esClient, ragsearch.WithIndex(cfg.Rag.ChunkIndex), ragsearch.WithEmbeddingDim(cfg.Rag.EmbeddingDim), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
+		RAGSearcher:       ragsearch.NewSearcher[models.RAGChunkSource](mem.Dense(), mem.Keyword(), ragsearch.WithEmbeddingDim(cfg.Rag.EmbeddingDim), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
 		RAGWebCrawler:     webcrawl.NewCrawler(webcrawl.WithHTTPClient(testWebCrawlerHTTPClient{}), webcrawl.WithURLGuard(testWebCrawlerGuard{})),
 		SkillRegistry:     skillRegistry,
 		Realtime:          testRealtimeBroker{},

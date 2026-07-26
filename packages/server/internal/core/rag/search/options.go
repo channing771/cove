@@ -1,7 +1,6 @@
 package search
 
 const (
-	defaultIndex          = "cove_chunks"
 	defaultVectorWeight   = 0.6
 	defaultBM25Weight     = 0.4
 	defaultTopK           = 5
@@ -15,12 +14,10 @@ const (
 // FilterBuilder 和 sourceDecoder 用于把业务过滤和业务元数据解码留给调用方。
 // Rerank 相关字段只控制第二阶段重排，未配置 Reranker 时不会触发重排。
 type Options struct {
-	Index                 string
 	EmbeddingDim          int
 	RecallSize            int
 	VectorWeight          float64
 	BM25Weight            float64
-	KnnOversample         int
 	Embedder              Embedder
 	Reranker              Reranker
 	RerankWindowSize      int
@@ -30,20 +27,11 @@ type Options struct {
 	RerankDocumentBuilder RerankDocumentBuilder
 	LowRelevanceThreshold *float64      // 低相关状态阈值
 	FilterBuilder         FilterBuilder // 请求过滤构造器
-	sourceDecoder         any           // ES _source 到业务元数据的解码器
+	sourceDecoder         any           // 命中字段到业务元数据的解码器
 }
 
 // Option 修改 Searcher 的长期配置。
 type Option func(*Options)
-
-// WithIndex 设置 Elasticsearch 索引名。
-func WithIndex(index string) Option {
-	return func(opts *Options) {
-		if index != "" {
-			opts.Index = index
-		}
-	}
-}
 
 // WithEmbeddingDim 设置向量化维度。
 func WithEmbeddingDim(embeddingDim int) Option {
@@ -74,17 +62,6 @@ func WithVectorWeight(vectorWeight float64) Option {
 func WithBM25Weight(bm25Weight float64) Option {
 	return func(opts *Options) {
 		opts.BM25Weight = bm25Weight
-	}
-}
-
-// WithKnnOversample 设置 ES knn num_candidates 的过采样倍数。
-//
-// knnOversample 小于等于 0 时不写 num_candidates，由 ES 使用默认策略。
-func WithKnnOversample(knnOversample int) Option {
-	return func(opts *Options) {
-		if knnOversample > 0 {
-			opts.KnnOversample = knnOversample
-		}
 	}
 }
 
@@ -148,7 +125,7 @@ func WithRerankMinScore(score float64) Option {
 
 // WithRerankDocumentBuilder 设置重排文档构造器。
 //
-// builder 为 nil 时忽略该配置，默认使用 ES _source 中的 content 字段。
+// builder 为 nil 时忽略该配置，默认使用命中字段中的 content 字段。
 func WithRerankDocumentBuilder(builder RerankDocumentBuilder) Option {
 	return func(opts *Options) {
 		if builder != nil {
@@ -175,7 +152,7 @@ func WithFilterBuilder(builder FilterBuilder) Option {
 	}
 }
 
-// WithSourceDecoder 设置 ES _source 到业务元数据的解码器。
+// WithSourceDecoder 设置命中字段到业务元数据的解码器。
 func WithSourceDecoder[T any](decoder SourceDecoder[T]) Option {
 	return func(opts *Options) {
 		if decoder != nil {

@@ -8,31 +8,78 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/core/valuex"
 )
 
-type fakeESClient struct {
-	calls []esCall
-	err   error
-	resps []map[string]any
+// fakeDense 实现 vectorstore.DenseIndex，记录 Search 入参并返回预置命中。
+type fakeDense struct {
+	calls      int
+	lastVector []float64
+	lastK      int
+	lastFilter vectorstore.Filter
+	hits       []vectorstore.Hit
+	err        error
 }
 
-type esCall struct {
-	index string
-	query any
+func (f *fakeDense) EnsureCollection(ctx context.Context, dim int) error          { return nil }
+func (f *fakeDense) Upsert(ctx context.Context, points []vectorstore.Point) error { return nil }
+func (f *fakeDense) DeleteByFilter(ctx context.Context, filter vectorstore.Filter) error {
+	return nil
+}
+func (f *fakeDense) SetFields(ctx context.Context, filter vectorstore.Filter, fields map[string]any) error {
+	return nil
+}
+func (f *fakeDense) Search(ctx context.Context, vector []float64, k int, filter vectorstore.Filter) ([]vectorstore.Hit, error) {
+	f.calls++
+	f.lastVector = vector
+	f.lastK = k
+	f.lastFilter = filter
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.hits, nil
 }
 
-func (c *fakeESClient) Search(ctx context.Context, index string, query any) (map[string]any, error) {
-	c.calls = append(c.calls, esCall{index: index, query: query})
-	if c.err != nil {
-		return nil, c.err
+// fakeKeyword 实现 vectorstore.KeywordIndex，Search 返回 BM25 命中，Fetch 返回 parent 命中。
+type fakeKeyword struct {
+	searchCalls     int
+	lastQuery       string
+	lastK           int
+	lastFilter      vectorstore.Filter
+	hits            []vectorstore.Hit
+	err             error
+	fetchCalls      int
+	lastFetchFilter vectorstore.Filter
+	fetchHits       []vectorstore.Hit
+	fetchErr        error
+}
+
+func (f *fakeKeyword) EnsureIndex(ctx context.Context) error                     { return nil }
+func (f *fakeKeyword) Index(ctx context.Context, docs []vectorstore.Point) error { return nil }
+func (f *fakeKeyword) DeleteByFilter(ctx context.Context, filter vectorstore.Filter) error {
+	return nil
+}
+func (f *fakeKeyword) SetFields(ctx context.Context, filter vectorstore.Filter, fields map[string]any) error {
+	return nil
+}
+func (f *fakeKeyword) Search(ctx context.Context, query string, k int, filter vectorstore.Filter) ([]vectorstore.Hit, error) {
+	f.searchCalls++
+	f.lastQuery = query
+	f.lastK = k
+	f.lastFilter = filter
+	if f.err != nil {
+		return nil, f.err
 	}
-	if len(c.resps) == 0 {
-		return hitsResponse(), nil
+	return f.hits, nil
+}
+func (f *fakeKeyword) Fetch(ctx context.Context, filter vectorstore.Filter, size int) ([]vectorstore.Hit, error) {
+	f.fetchCalls++
+	f.lastFetchFilter = filter
+	if f.fetchErr != nil {
+		return nil, f.fetchErr
 	}
-	resp := c.resps[0]
-	c.resps = c.resps[1:]
-	return resp, nil
+	return f.fetchHits, nil
 }
 
 type fakeEmbedder struct {
@@ -74,37 +121,37 @@ type sourceMeta struct {
 	KBID    string
 }
 
-func decodeSourceMeta(src map[string]any) (sourceMeta, error) {
+func decodeSourceMeta(fields map[string]any) (sourceMeta, error) {
 	return sourceMeta{
-		DocName: valuex.String(src["doc_name"]),
-		KBID:    valuex.String(src["kb_id"]),
+		DocName: valuex.String(fields["doc_name"]),
+		KBID:    valuex.String(fields["kb_id"]),
 	}, nil
 }
 
 // 验证 NewSearcher 使用默认配置，并且 WithOption 能覆盖默认值。
 func TestNewSearcherAppliesOptions(t *testing.T) {
 	reranker := &fakeReranker{}
-	esClient := &fakeESClient{}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{}
-	filterBuilder := func(ctx context.Context, req Input) ([]any, error) {
-		return []any{map[string]any{"term": map[string]any{"tenant": "u-1"}}}, nil
+	filterBuilder := func(ctx context.Context, req Input) (vectorstore.Filter, error) {
+		return vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("tenant", "u-1")}}, nil
 	}
 
 	searcher := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
-		WithIndex("custom_chunks"),
 		WithEmbeddingDim(2048),
 		WithRecallSize(30),
 		WithVectorWeight(0.7),
 		WithBM25Weight(0.3),
-		WithKnnOversample(5),
 		WithReranker(reranker),
 		WithRerankWindowSize(9),
 		WithRerankTopK(4),
 		WithRerankFailOpen(false),
 		WithRerankMinScore(0.2),
-		WithRerankDocumentBuilder(func(src map[string]any) string {
+		WithRerankDocumentBuilder(func(fields map[string]any) string {
 			return "custom"
 		}),
 		WithLowRelevanceThreshold(0.45),
@@ -112,11 +159,8 @@ func TestNewSearcherAppliesOptions(t *testing.T) {
 		WithSourceDecoder[sourceMeta](decodeSourceMeta),
 	)
 
-	if searcher.es != esClient || searcher.Embedder != embedder {
+	if searcher.dense != dense || searcher.keyword != keyword || searcher.Embedder != embedder {
 		t.Fatalf("dependencies were not assigned")
-	}
-	if searcher.Index != "custom_chunks" {
-		t.Fatalf("Index = %q, want custom_chunks", searcher.Index)
 	}
 	if searcher.EmbeddingDim != 2048 {
 		t.Fatalf("EmbeddingDim = %d, want 2048", searcher.EmbeddingDim)
@@ -126,9 +170,6 @@ func TestNewSearcherAppliesOptions(t *testing.T) {
 	}
 	if searcher.VectorWeight != 0.7 || searcher.BM25Weight != 0.3 {
 		t.Fatalf("weights = %v/%v, want 0.7/0.3", searcher.VectorWeight, searcher.BM25Weight)
-	}
-	if searcher.KnnOversample != 5 {
-		t.Fatalf("KnnOversample = %d, want 5", searcher.KnnOversample)
 	}
 	if searcher.Reranker != reranker {
 		t.Fatalf("Reranker = %#v, want fake reranker", searcher.Reranker)
@@ -162,33 +203,35 @@ func TestNormalizeScores(t *testing.T) {
 	}
 }
 
-// 验证 filter builder 出错时会直接返回错误，不访问 embedding 和 ES。
+// 验证 filter builder 出错时会直接返回错误，不访问 embedding 和存储。
 func TestSearcherReturnsFilterBuilderErrorBeforeDependencies(t *testing.T) {
 	wantErr := errors.New("build filter failed")
-	esClient := &fakeESClient{}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	_, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithFilterBuilder(func(ctx context.Context, req Input) ([]any, error) {
-		return nil, wantErr
+	_, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithFilterBuilder(func(ctx context.Context, req Input) (vectorstore.Filter, error) {
+		return vectorstore.Filter{}, wantErr
 	})).Search(context.Background(), "hello")
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("Search() error = %v, want %v", err, wantErr)
 	}
-	if embedder.calls != 0 || len(esClient.calls) != 0 {
-		t.Fatalf("dependency calls = embedder %d es %d, want zero", embedder.calls, len(esClient.calls))
+	if embedder.calls != 0 || dense.calls != 0 || keyword.searchCalls != 0 {
+		t.Fatalf("dependency calls = embedder %d dense %d keyword %d, want zero", embedder.calls, dense.calls, keyword.searchCalls)
 	}
 }
 
-// 验证 Search 的 InputOption 会同时影响向量召回和 BM25 召回。
-func TestSearcherUsesRequestOptionsInVectorAndBM25Queries(t *testing.T) {
-	filter := []any{
-		map[string]any{"term": map[string]any{"tenant": "u-1"}},
-		map[string]any{"terms": map[string]any{"kb_id": []string{"kb-1", "kb-2"}}},
-	}
-	esClient := &fakeESClient{resps: []map[string]any{hitsResponse(), hitsResponse()}}
+// 验证 Search 的 InputOption 会同时影响向量召回和 BM25 召回（中立过滤 + recallSize + query 透传）。
+func TestSearcherUsesRequestOptionsInVectorAndKeywordRecall(t *testing.T) {
+	filter := vectorstore.Filter{Must: []vectorstore.Condition{
+		vectorstore.Eq("tenant", "u-1"),
+		vectorstore.In("kb_id", []string{"kb-1", "kb-2"}),
+	}}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1, 0.2}}
 
-	_, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithIndex("chunks"), WithEmbeddingDim(512)).
+	_, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithEmbeddingDim(512)).
 		Search(context.Background(), "search text", WithFilters(filter), WithTopK(3), WithInputRecallSize(7))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
@@ -196,43 +239,22 @@ func TestSearcherUsesRequestOptionsInVectorAndBM25Queries(t *testing.T) {
 	if embedder.calls != 1 || embedder.dim != 512 {
 		t.Fatalf("embedder calls/dim = %d/%d, want 1/512", embedder.calls, embedder.dim)
 	}
-	if len(esClient.calls) != 2 {
-		t.Fatalf("es calls = %d, want 2", len(esClient.calls))
+	if dense.calls != 1 || dense.lastK != 7 || !reflect.DeepEqual(dense.lastFilter, filter) {
+		t.Fatalf("dense recall = calls %d k %d filter %#v, want 1/7/%#v", dense.calls, dense.lastK, dense.lastFilter, filter)
 	}
-	vectorQuery := esClient.calls[0].query.(map[string]any)
-	if vectorQuery["size"] != 7 {
-		t.Fatalf("vector size = %#v, want 7", vectorQuery["size"])
-	}
-	knn := vectorQuery["knn"].(map[string]any)
-	if knn["k"] != 7 {
-		t.Fatalf("knn = %#v, want k=7", knn)
-	}
-	if _, ok := knn["num_candidates"]; ok {
-		t.Fatalf("num_candidates = %#v, want omitted by default", knn["num_candidates"])
-	}
-	gotVectorFilter := mustFilter(t, knn["filter"])
-	if !reflect.DeepEqual(gotVectorFilter, filter) {
-		t.Fatalf("vector filter = %#v, want %#v", gotVectorFilter, filter)
-	}
-
-	bm25Query := esClient.calls[1].query.(map[string]any)
-	gotBM25Filter := bm25Query["query"].(map[string]any)["bool"].(map[string]any)["filter"].([]any)
-	if !reflect.DeepEqual(gotBM25Filter, filter) {
-		t.Fatalf("bm25 filter = %#v, want %#v", gotBM25Filter, filter)
-	}
-	must := bm25Query["query"].(map[string]any)["bool"].(map[string]any)["must"].([]any)
-	if !reflect.DeepEqual(must, []any{map[string]any{"match": map[string]any{"content": "search text"}}}) {
-		t.Fatalf("bm25 must = %#v", must)
+	if keyword.searchCalls != 1 || keyword.lastK != 7 || keyword.lastQuery != "search text" || !reflect.DeepEqual(keyword.lastFilter, filter) {
+		t.Fatalf("keyword recall = calls %d k %d query %q filter %#v", keyword.searchCalls, keyword.lastK, keyword.lastQuery, keyword.lastFilter)
 	}
 }
 
 // 验证请求级 embedder 会覆盖构造级默认 embedder。
 func TestSearcherUsesInputEmbedderBeforeDefaultEmbedder(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{hitsResponse(), hitsResponse()}}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 	defaultEmbedder := &fakeEmbedder{vec: []float64{0.1}}
 	inputEmbedder := &fakeEmbedder{vec: []float64{0.2}}
 
-	_, err := NewSearcher[sourceMeta](esClient, WithEmbedder(defaultEmbedder)).
+	_, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(defaultEmbedder)).
 		Search(context.Background(), "query", WithInputEmbedder(inputEmbedder))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
@@ -247,29 +269,32 @@ func TestSearcherUsesInputEmbedderBeforeDefaultEmbedder(t *testing.T) {
 
 // 验证构造级和请求级都没有 embedder 时返回明确错误。
 func TestSearcherReturnsErrorWithoutEmbedder(t *testing.T) {
-	esClient := &fakeESClient{}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 
-	_, err := NewSearcher[sourceMeta](esClient).Search(context.Background(), "query")
+	_, err := NewSearcher[sourceMeta](dense, keyword).Search(context.Background(), "query")
 	if err == nil || err.Error() != "rag search embedder is nil" {
 		t.Fatalf("Search() error = %v, want rag search embedder is nil", err)
 	}
-	if len(esClient.calls) != 0 {
-		t.Fatalf("es calls = %d, want 0", len(esClient.calls))
+	if dense.calls != 0 || keyword.searchCalls != 0 {
+		t.Fatalf("store calls = dense %d keyword %d, want 0", dense.calls, keyword.searchCalls)
 	}
 }
 
 // 验证自定义 filter builder 会收到内部 Input，并且 Input 未设置 recallSize 时使用 searcher option 默认值。
 func TestSearcherUsesFilterBuilderAndOptionRecallSize(t *testing.T) {
-	filter := []any{map[string]any{"term": map[string]any{"tenant": "from-builder"}}}
-	esClient := &fakeESClient{resps: []map[string]any{hitsResponse(), hitsResponse()}}
+	filter := vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("tenant", "from-builder")}}
+	dense := &fakeDense{}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 	calls := 0
 
 	_, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithRecallSize(11),
-		WithFilterBuilder(func(ctx context.Context, req Input) ([]any, error) {
+		WithFilterBuilder(func(ctx context.Context, req Input) (vectorstore.Filter, error) {
 			calls++
 			if req.Query != "query" || req.TopK != 2 {
 				t.Fatalf("request passed to filter builder = %#v", req)
@@ -283,33 +308,11 @@ func TestSearcherUsesFilterBuilderAndOptionRecallSize(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("filter builder calls = %d, want 1", calls)
 	}
-	if len(esClient.calls) != 2 {
-		t.Fatalf("es calls = %d, want 2", len(esClient.calls))
+	if dense.lastK != 11 || !reflect.DeepEqual(dense.lastFilter, filter) {
+		t.Fatalf("dense recall = k %d filter %#v, want 11/%#v", dense.lastK, dense.lastFilter, filter)
 	}
-	vectorQuery := esClient.calls[0].query.(map[string]any)
-	if vectorQuery["size"] != 11 {
-		t.Fatalf("vector size = %#v, want 11", vectorQuery["size"])
-	}
-	if got := mustFilter(t, vectorQuery["knn"].(map[string]any)["filter"]); !reflect.DeepEqual(got, filter) {
-		t.Fatalf("vector filter = %#v, want %#v", got, filter)
-	}
-}
-
-// 验证 knn oversample 显式配置后写入 num_candidates。
-func TestSearcherUsesConfiguredKnnOversample(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{hitsResponse(), hitsResponse()}}
-	embedder := &fakeEmbedder{vec: []float64{0.1}}
-
-	_, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithKnnOversample(3)).
-		Search(context.Background(), "query", WithInputRecallSize(8))
-	if err != nil {
-		t.Fatalf("Search() error = %v", err)
-	}
-
-	vectorQuery := esClient.calls[0].query.(map[string]any)
-	knn := vectorQuery["knn"].(map[string]any)
-	if knn["num_candidates"] != 24 {
-		t.Fatalf("num_candidates = %#v, want 24", knn["num_candidates"])
+	if keyword.lastK != 11 || !reflect.DeepEqual(keyword.lastFilter, filter) {
+		t.Fatalf("keyword recall = k %d filter %#v, want 11/%#v", keyword.lastK, keyword.lastFilter, filter)
 	}
 }
 
@@ -317,20 +320,22 @@ func TestSearcherUsesConfiguredKnnOversample(t *testing.T) {
 func TestSearcherFusesScoresAndDecodesSource(t *testing.T) {
 	childSrc := source("both child", "parent-both")
 	childSrc["doc_name"] = "ChildDoc"
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(
-			hit("vec-only", 0.9, source("vec only", "")),
-			hit("both", 0.8, childSrc),
-		),
-		hitsResponse(
+	dense := &fakeDense{hits: []vectorstore.Hit{
+		hit("vec-only", 0.9, source("vec only", "")),
+		hit("both", 0.8, childSrc),
+	}}
+	keyword := &fakeKeyword{
+		hits: []vectorstore.Hit{
 			hit("bm-only", 20, source("bm only", "")),
 			hit("both", 10, childSrc),
-		),
-		hitsResponse(hit("parent-both-hit", 1, map[string]any{"chunk_id": "parent-both", "content": "parent content", "doc_name": "ParentDoc"})),
-	}}
+		},
+		fetchHits: []vectorstore.Hit{
+			hit("parent-both-hit", 1, map[string]any{"chunk_id": "parent-both", "content": "parent content", "doc_name": "ParentDoc"}),
+		},
+	}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	got, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithSourceDecoder[sourceMeta](decodeSourceMeta)).
+	got, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithSourceDecoder[sourceMeta](decodeSourceMeta)).
 		Search(context.Background(), "query", WithTopK(3))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
@@ -351,13 +356,11 @@ func TestSearcherFusesScoresAndDecodesSource(t *testing.T) {
 // 验证 source decoder 出错时 Search 会返回错误，避免静默丢失业务元数据。
 func TestSearcherReturnsDecoderError(t *testing.T) {
 	wantErr := errors.New("decode failed")
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 1, source("doc a", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 1, source("doc a", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	_, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithSourceDecoder[sourceMeta](func(src map[string]any) (sourceMeta, error) {
+	_, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithSourceDecoder[sourceMeta](func(fields map[string]any) (sourceMeta, error) {
 		return sourceMeta{}, wantErr
 	})).Search(context.Background(), "query", WithTopK(1))
 	if !errors.Is(err, wantErr) {
@@ -367,13 +370,11 @@ func TestSearcherReturnsDecoderError(t *testing.T) {
 
 // 验证未配置 source decoder 时，Output.Source 使用类型零值。
 func TestSearcherUsesZeroSourceWithoutDecoder(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 1, source("doc a", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 1, source("doc a", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	got, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder)).Search(context.Background(), "query", WithTopK(1))
+	got, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder)).Search(context.Background(), "query", WithTopK(1))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
@@ -383,25 +384,25 @@ func TestSearcherUsesZeroSourceWithoutDecoder(t *testing.T) {
 }
 
 // 验证 MinVectorScore 只过滤向量不达标的候选，保留候选继续参与 BM25 融合和 rerank。
+// 约定 dense 分数即 cosine 相似度，直接与阈值比较。
 func TestSearcherFiltersByMinVectorScore(t *testing.T) {
 	threshold := 0.5
 	reranker := &fakeReranker{results: []RerankResult{{Index: 0, Score: 1}, {Index: 1, Score: 0.9}}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(
-			hit("semantic", 0.9, source("semantic", "")),
-			hit("lexical", 0.8, source("lexical", "")),
-			hit("low", 0.7, source("low", "")),
-		),
-		hitsResponse(
-			hit("bm-only", 100, source("bm only", "")),
-			hit("lexical", 20, source("lexical", "")),
-			hit("semantic", 10, source("semantic", "")),
-		),
+	dense := &fakeDense{hits: []vectorstore.Hit{
+		hit("semantic", 0.8, source("semantic", "")),
+		hit("lexical", 0.6, source("lexical", "")),
+		hit("low", 0.4, source("low", "")),
+	}}
+	keyword := &fakeKeyword{hits: []vectorstore.Hit{
+		hit("bm-only", 100, source("bm only", "")),
+		hit("lexical", 20, source("lexical", "")),
+		hit("semantic", 10, source("semantic", "")),
 	}}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithVectorWeight(0.4),
 		WithBM25Weight(0.6),
@@ -423,32 +424,30 @@ func TestSearcherFiltersByMinVectorScore(t *testing.T) {
 
 // 验证 child 指向的 parent 查不到时，会回退返回 child 自身内容。
 func TestSearcherFallsBackToChildContentWhenParentMissing(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("child", 1, source("child content", "missing-parent"))),
-		hitsResponse(),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("child", 1, source("child content", "missing-parent"))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	got, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder)).Search(context.Background(), "query", WithTopK(1))
+	got, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder)).Search(context.Background(), "query", WithTopK(1))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
 	if len(got.Results) != 1 || got.Results[0].Content != "child content" {
 		t.Fatalf("results = %#v, want child content fallback", got)
 	}
+	if keyword.fetchCalls != 1 {
+		t.Fatalf("keyword fetch calls = %d, want 1", keyword.fetchCalls)
+	}
 }
 
 // 验证 reranker 成功时按重排顺序返回，失败时回退融合排序。
 func TestSearcherUsesRerankerAndFallsBackOnError(t *testing.T) {
 	reranker := &fakeReranker{results: []RerankResult{{Index: 1, Score: 0.99}, {Index: 0, Score: 0.5}}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	got, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithReranker(reranker)).Search(context.Background(), "query", WithTopK(2))
+	got, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithReranker(reranker)).Search(context.Background(), "query", WithTopK(2))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
@@ -462,11 +461,8 @@ func TestSearcherUsesRerankerAndFallsBackOnError(t *testing.T) {
 		t.Fatalf("reranker calls/documents = %d/%#v", reranker.calls, reranker.documents)
 	}
 
-	fallbackES := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))),
-		hitsResponse(),
-	}}
-	fallback, err := NewSearcher[sourceMeta](fallbackES, WithEmbedder(embedder), WithReranker(&fakeReranker{err: errors.New("rerank failed")})).
+	fallbackDense := &fakeDense{hits: []vectorstore.Hit{hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))}}
+	fallback, err := NewSearcher[sourceMeta](fallbackDense, &fakeKeyword{}, WithEmbedder(embedder), WithReranker(&fakeReranker{err: errors.New("rerank failed")})).
 		Search(context.Background(), "query", WithTopK(2))
 	if err != nil {
 		t.Fatalf("fallback Search() error = %v", err)
@@ -479,14 +475,13 @@ func TestSearcherUsesRerankerAndFallsBackOnError(t *testing.T) {
 // 验证低相关状态优先使用 rerank 分数，并且不会过滤原始结果。
 func TestSearcherReportsLowRelevanceByRerankScore(t *testing.T) {
 	reranker := &fakeReranker{results: []RerankResult{{Index: 0, Score: 0.3}, {Index: 1, Score: 0.2}}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 0.95, source("doc a", "")), hit("b", 0.9, source("doc b", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 0.95, source("doc a", "")), hit("b", 0.9, source("doc b", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithReranker(reranker),
 		WithLowRelevanceThreshold(0.5),
@@ -508,16 +503,15 @@ func TestSearcherReportsLowRelevanceByRerankScore(t *testing.T) {
 	}
 }
 
-// 验证没有 rerank 分数时，低相关状态使用向量 cosine 原始分数而不是归一化融合分。
+// 验证没有 rerank 分数时，低相关状态使用向量 cosine 分数（约定 dense 分数即 cosine）。
 func TestSearcherReportsLowRelevanceByVectorCosine(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 0.7, source("doc a", "")), hit("b", 0.55, source("doc b", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 0.4, source("doc a", "")), hit("b", 0.3, source("doc b", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithLowRelevanceThreshold(0.5),
 	).Search(context.Background(), "query", WithTopK(2))
@@ -537,14 +531,13 @@ func TestSearcherReportsLowRelevanceByVectorCosine(t *testing.T) {
 
 // 验证请求级低相关阈值会覆盖构造级阈值。
 func TestSearcherInputLowRelevanceThresholdOverridesDefault(t *testing.T) {
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 0.7, source("doc a", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 0.7, source("doc a", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithLowRelevanceThreshold(0.9),
 	).Search(context.Background(), "query", WithTopK(1), WithInputLowRelevanceThreshold(0.1))
@@ -562,13 +555,11 @@ func TestSearcherInputLowRelevanceThresholdOverridesDefault(t *testing.T) {
 // 验证请求级配置可以关闭构造级 reranker。
 func TestSearcherCanDisableRerankPerInput(t *testing.T) {
 	reranker := &fakeReranker{results: []RerankResult{{Index: 1, Score: 1}}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
-	got, err := NewSearcher[sourceMeta](esClient, WithEmbedder(embedder), WithReranker(reranker)).
+	got, err := NewSearcher[sourceMeta](dense, keyword, WithEmbedder(embedder), WithReranker(reranker)).
 		Search(context.Background(), "query", WithTopK(2), WithInputRerankEnabled(false))
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
@@ -590,20 +581,19 @@ func TestSearcherUsesRerankWindowTopKAndDocumentBuilder(t *testing.T) {
 	second["title"] = "B"
 	third := source("doc c", "")
 	third["title"] = "C"
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 3, first), hit("b", 2, second), hit("c", 1, third)),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 3, first), hit("b", 2, second), hit("c", 1, third)}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithReranker(reranker),
 		WithRerankWindowSize(2),
 		WithRerankTopK(1),
-		WithRerankDocumentBuilder(func(src map[string]any) string {
-			return valuex.String(src["title"]) + ":" + valuex.String(src["content"])
+		WithRerankDocumentBuilder(func(fields map[string]any) string {
+			return valuex.String(fields["title"]) + ":" + valuex.String(fields["content"])
 		}),
 	).Search(context.Background(), "query", WithTopK(3))
 	if err != nil {
@@ -628,14 +618,13 @@ func TestSearcherFiltersInvalidDuplicateAndLowScoreRerankResults(t *testing.T) {
 		{Index: 0, Score: 0.9},
 		{Index: 0, Score: 0.8},
 	}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 2, source("doc a", "")), hit("b", 1, source("doc b", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithReranker(reranker),
 		WithRerankMinScore(0.5),
@@ -654,14 +643,13 @@ func TestSearcherFiltersInvalidDuplicateAndLowScoreRerankResults(t *testing.T) {
 // 验证 fail-open 关闭时，reranker 错误会直接返回。
 func TestSearcherReturnsRerankErrorWhenFailClosed(t *testing.T) {
 	wantErr := errors.New("rerank failed")
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 1, source("doc a", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 1, source("doc a", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	_, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithReranker(&fakeReranker{err: wantErr}),
 		WithRerankFailOpen(false),
@@ -675,14 +663,13 @@ func TestSearcherReturnsRerankErrorWhenFailClosed(t *testing.T) {
 func TestSearcherInputRerankOptionsOverrideSearcherOptions(t *testing.T) {
 	defaultReranker := &fakeReranker{err: errors.New("should not be used")}
 	inputReranker := &fakeReranker{results: []RerankResult{{Index: 1, Score: 0.6}, {Index: 0, Score: 0.4}}}
-	esClient := &fakeESClient{resps: []map[string]any{
-		hitsResponse(hit("a", 3, source("doc a", "")), hit("b", 2, source("doc b", "")), hit("c", 1, source("doc c", ""))),
-		hitsResponse(),
-	}}
+	dense := &fakeDense{hits: []vectorstore.Hit{hit("a", 3, source("doc a", "")), hit("b", 2, source("doc b", "")), hit("c", 1, source("doc c", ""))}}
+	keyword := &fakeKeyword{}
 	embedder := &fakeEmbedder{vec: []float64{0.1}}
 
 	got, err := NewSearcher[sourceMeta](
-		esClient,
+		dense,
+		keyword,
 		WithEmbedder(embedder),
 		WithReranker(defaultReranker),
 		WithRerankWindowSize(3),
@@ -698,8 +685,8 @@ func TestSearcherInputRerankOptionsOverrideSearcherOptions(t *testing.T) {
 		WithInputRerankTopK(1),
 		WithInputRerankFailOpen(true),
 		WithInputRerankMinScore(0.5),
-		WithInputRerankDocumentBuilder(func(src map[string]any) string {
-			return "input:" + valuex.String(src["content"])
+		WithInputRerankDocumentBuilder(func(fields map[string]any) string {
+			return "input:" + valuex.String(fields["content"])
 		}),
 	)
 	if err != nil {
@@ -727,16 +714,8 @@ func TestNoopSearcherReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-func hitsResponse(hits ...map[string]any) map[string]any {
-	values := make([]any, 0, len(hits))
-	for _, h := range hits {
-		values = append(values, h)
-	}
-	return map[string]any{"hits": map[string]any{"hits": values}}
-}
-
-func hit(id string, score float64, src map[string]any) map[string]any {
-	return map[string]any{"_id": id, "_score": score, "_source": src}
+func hit(id string, score float64, fields map[string]any) vectorstore.Hit {
+	return vectorstore.Hit{ID: id, Score: score, Fields: fields}
 }
 
 func source(content string, parentID string) map[string]any {
@@ -759,10 +738,4 @@ func resultIDs(result *SearchResult[sourceMeta]) []string {
 		ids = append(ids, result.ID)
 	}
 	return ids
-}
-
-func mustFilter(t *testing.T, value any) []any {
-	t.Helper()
-	filter := value.(map[string]any)["bool"].(map[string]any)["filter"].([]any)
-	return filter
 }

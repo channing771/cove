@@ -9,8 +9,10 @@ import (
 
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	coretool "github.com/boxify/api-go/internal/core/tool"
 	"github.com/boxify/api-go/internal/domain/types"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/security"
 	"github.com/boxify/api-go/internal/models"
 	"github.com/boxify/api-go/internal/repository"
@@ -259,6 +261,7 @@ func newKnowledgeToolTestServiceContextWithVectors(t *testing.T, userID uuid.UUI
 	}
 	llmManager := corellm.NewManager()
 	llmManager.Register("fake", fakeKnowledgeToolLLMFactory{vectors: vectors})
+	dense, keyword := esClient.stores()
 	return &svc.ServiceContext{
 		KnowledgeBaseRepo: &fakeKnowledgeToolKBRepo{rows: knowledgeToolRows(userID, kbIDs...)},
 		ModelConfigRepo: &fakeKnowledgeToolModelConfigRepo{rows: []*models.ModelConfig{{
@@ -272,8 +275,8 @@ func newKnowledgeToolTestServiceContextWithVectors(t *testing.T, userID uuid.UUI
 		SecretCipher: cipher,
 		LLMManager:   llmManager,
 		RAGSearcher: ragsearch.NewSearcher[models.RAGChunkSource](
-			esClient,
-			ragsearch.WithIndex("boxify_chunks"),
+			dense,
+			keyword,
 			ragsearch.WithEmbeddingDim(3),
 			ragsearch.WithSourceDecoder[models.RAGChunkSource](decodeKnowledgeToolSource),
 		),
@@ -492,6 +495,9 @@ func (c fakeKnowledgeToolLLM) EmbedOne(ctx context.Context, text string, dimensi
 	return []float64{0.1, 0.2, 0.3}, nil
 }
 
+// fakeKnowledgeToolES 现在承载 DB 中立的内存 RAG 存储：它把测试期望的 chunk 播种进
+// memory.Store，并通过录制包装器记录每次检索使用的中立 vectorstore.Filter，供断言校验
+// user_id/kb_id/tags 隔离条件是否生效。
 type fakeKnowledgeToolES struct {
 	queries    []any
 	chunkID    uuid.UUID
@@ -500,27 +506,60 @@ type fakeKnowledgeToolES struct {
 	userID     uuid.UUID
 }
 
-func (e *fakeKnowledgeToolES) Search(ctx context.Context, index string, query any) (map[string]any, error) {
-	e.queries = append(e.queries, query)
-	return map[string]any{
-		"hits": map[string]any{
-			"hits": []any{
-				map[string]any{
-					"_id":    e.chunkID.String(),
-					"_score": float64(2),
-					"_source": map[string]any{
-						"chunk_id":    e.chunkID.String(),
-						"source_id":   e.documentID.String(),
-						"user_id":     e.userID.String(),
-						"kb_id":       e.kbID.String(),
-						"name":        "guide.md",
-						"source_type": "file",
-						"content":     "hello chunk",
-					},
-				},
+// stores 播种内存存储并返回记录检索过滤条件的 Dense/Keyword 视图。
+func (e *fakeKnowledgeToolES) stores() (vectorstore.DenseIndex, vectorstore.KeywordIndex) {
+	mem := memory.New()
+	if e.chunkID != uuid.Nil {
+		_ = mem.Upsert(context.Background(), []vectorstore.Point{{
+			ID:     e.chunkID.String(),
+			Vector: []float64{0.1, 0.2, 0.3},
+			Fields: map[string]any{
+				"chunk_id":    e.chunkID.String(),
+				"source_id":   e.documentID.String(),
+				"user_id":     e.userID.String(),
+				"kb_id":       e.kbID.String(),
+				"name":        "guide.md",
+				"source_type": "file",
+				"content":     "hello chunk",
+				"level":       "parent",
+				// 覆盖各测试可能解析出的标签，确保 tags 硬过滤命中时仍能召回。
+				"tags": []string{"重要", "财务", "产品"},
 			},
-		},
-	}, nil
+		}})
+	}
+	return recordingDense{DenseIndex: mem.Dense(), es: e}, recordingKeyword{KeywordIndex: mem.Keyword(), es: e}
+}
+
+// record 把中立过滤条件展开成 map 并追加到 queries，使 %#v 输出包含字段名与取值，
+// 供既有的 user_id/kb_id/tags 字符串断言复用。
+func (e *fakeKnowledgeToolES) record(filter vectorstore.Filter) {
+	captured := map[string]any{}
+	for _, condition := range filter.Must {
+		captured[condition.Field] = condition.Value
+	}
+	e.queries = append(e.queries, captured)
+}
+
+// recordingDense 记录稠密召回使用的过滤条件后委托给内存存储。
+type recordingDense struct {
+	vectorstore.DenseIndex
+	es *fakeKnowledgeToolES
+}
+
+func (d recordingDense) Search(ctx context.Context, vector []float64, k int, filter vectorstore.Filter) ([]vectorstore.Hit, error) {
+	d.es.record(filter)
+	return d.DenseIndex.Search(ctx, vector, k, filter)
+}
+
+// recordingKeyword 记录关键词召回使用的过滤条件后委托给内存存储。
+type recordingKeyword struct {
+	vectorstore.KeywordIndex
+	es *fakeKnowledgeToolES
+}
+
+func (kw recordingKeyword) Search(ctx context.Context, query string, k int, filter vectorstore.Filter) ([]vectorstore.Hit, error) {
+	kw.es.record(filter)
+	return kw.KeywordIndex.Search(ctx, query, k, filter)
 }
 
 func decodeKnowledgeToolSource(src map[string]any) (models.RAGChunkSource, error) {

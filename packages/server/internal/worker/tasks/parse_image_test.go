@@ -2,11 +2,8 @@ package tasks
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -14,11 +11,11 @@ import (
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	ragclassifier "github.com/boxify/api-go/internal/core/rag/classifier"
 	"github.com/boxify/api-go/internal/domain/types"
-	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/security"
 	"github.com/boxify/api-go/internal/models"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
+	"github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/xerr"
 	"github.com/google/uuid"
@@ -148,39 +145,7 @@ func TestHandleParseImageProcessesImage(t *testing.T) {
 	store.data[row.FileKey] = []byte("fake-image-bytes")
 
 	var events []string
-	indexedDocs := map[string]map[string]any{}
-	var updateTagsBody map[string]any
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusNotFound)
-		case r.Method == http.MethodPut && r.URL.Path == "/boxify_chunks":
-			_, _ = w.Write([]byte(`{"acknowledged":true}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_update_by_query":
-			events = append(events, "es:update_tags")
-			if err := json.NewDecoder(r.Body).Decode(&updateTagsBody); err != nil {
-				t.Fatalf("decode update tags body: %v", err)
-			}
-			_, _ = w.Write([]byte(`{"updated":1}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode indexed chunk body: %v", err)
-			}
-			indexedDocs[strings.TrimPrefix(r.URL.Path, "/boxify_chunks/_doc/")] = body
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -208,8 +173,7 @@ func TestHandleParseImageProcessesImage(t *testing.T) {
 		}},
 		SecretCipher:  cipher,
 		Storage:       store,
-		Elasticsearch: esClient,
-		RAGChunkRepo:  repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:  ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGClassifier: ragclassifier.NewClassifier(),
 		LLMManager:    newFakeLLMManager(visionClient),
 	})
@@ -239,15 +203,17 @@ func TestHandleParseImageProcessesImage(t *testing.T) {
 		!strings.Contains(joinedEvents, "progress:1.0") {
 		t.Fatalf("events = %v, want staged progress updates", events)
 	}
-	if len(indexedDocs) != 1 {
-		t.Fatalf("indexed chunks = %d, want 1", len(indexedDocs))
+	chunks := fetchChunks(t, mem, imageID)
+	if len(chunks) != 1 {
+		t.Fatalf("indexed chunks = %d, want 1", len(chunks))
 	}
-	for _, body := range indexedDocs {
-		if body["source_id"] != imageID.String() || body["source_type"] != "image" || body["name"] != "cat.png" {
-			t.Fatalf("indexed body = %#v, want image source metadata", body)
+	for _, hit := range chunks {
+		if hit.Fields["source_id"] != imageID.String() || hit.Fields["source_type"] != "image" || hit.Fields["name"] != "cat.png" {
+			t.Fatalf("indexed fields = %#v, want image source metadata", hit.Fields)
 		}
-		if !strings.Contains(body["content"].(string), "一只猫") || !strings.Contains(body["content"].(string), "Cat") {
-			t.Fatalf("indexed content = %#v, want searchable description text", body["content"])
+		content, _ := hit.Fields["content"].(string)
+		if !strings.Contains(content, "一只猫") || !strings.Contains(content, "Cat") {
+			t.Fatalf("indexed content = %#v, want searchable description text", hit.Fields["content"])
 		}
 	}
 	if tagRepo.syncedUserID != userID || tagRepo.syncedDocumentID != imageID {
@@ -319,14 +285,7 @@ func TestHandleParseImageCompletesWithoutIndexWhenDescriptionEmpty(t *testing.T)
 	row := &models.Image{ID: imageID, UserID: userID, FileName: "a.png", FileExt: ".png", FileKey: "images/a.png", Status: types.ImageStatusPending}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("img")
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -345,8 +304,7 @@ func TestHandleParseImageCompletesWithoutIndexWhenDescriptionEmpty(t *testing.T)
 			{UserID: userID, Type: string(types.ChatModelType), Provider: "fake", ModelName: "db-chat", APIKeyEncrypted: encryptedAPIKey, IsDefault: true},
 		}},
 		SecretCipher:  cipher,
-		Elasticsearch: esClient,
-		RAGChunkRepo:  repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:  ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGClassifier: ragclassifier.NewClassifier(),
 		TagRepo:       &fakeTagRepository{},
 		LLMManager:    newFakeLLMManager(visionClient),
@@ -358,6 +316,9 @@ func TestHandleParseImageCompletesWithoutIndexWhenDescriptionEmpty(t *testing.T)
 	if row.Status != types.ImageStatusDone {
 		t.Fatalf("status = %s, want done", row.Status)
 	}
+	if hits := fetchChunks(t, mem, imageID); len(hits) != 0 {
+		t.Fatalf("indexed chunks = %d, want none when description empty", len(hits))
+	}
 }
 
 // 验证标签同步失败不阻断图片解析完成。
@@ -368,26 +329,7 @@ func TestHandleParseImageIgnoresTagSyncFailure(t *testing.T) {
 	row := &models.Image{ID: imageID, UserID: userID, FileName: "a.png", FileExt: ".png", FileKey: "images/a.png", Status: types.ImageStatusPending}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("img")
-	var indexCount int
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusOK)
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			indexCount++
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -410,8 +352,7 @@ func TestHandleParseImageIgnoresTagSyncFailure(t *testing.T) {
 			{UserID: userID, Type: string(types.ChatModelType), Provider: "fake", ModelName: "db-chat", APIKeyEncrypted: encryptedAPIKey, IsDefault: true},
 		}},
 		SecretCipher:  cipher,
-		Elasticsearch: esClient,
-		RAGChunkRepo:  repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:  ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGClassifier: ragclassifier.NewClassifier(),
 		TagRepo:       &fakeTagRepository{syncErr: errors.New("tag db down")},
 		LLMManager:    newFakeLLMManager(visionClient),
@@ -423,8 +364,8 @@ func TestHandleParseImageIgnoresTagSyncFailure(t *testing.T) {
 	if row.Status != types.ImageStatusDone {
 		t.Fatalf("status = %s, want done despite tag sync failure", row.Status)
 	}
-	if indexCount != 1 {
-		t.Fatalf("index count = %d, want 1", indexCount)
+	if hits := fetchChunks(t, mem, imageID); len(hits) != 1 {
+		t.Fatalf("indexed chunks = %d, want 1", len(hits))
 	}
 }
 

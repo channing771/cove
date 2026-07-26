@@ -9,6 +9,7 @@ import (
 
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	coretool "github.com/boxify/api-go/internal/core/tool"
 	"github.com/boxify/api-go/internal/domain/types"
 	"github.com/boxify/api-go/internal/models"
@@ -334,16 +335,16 @@ func knowledgeSearchResultMetadata(results []knowledgeSearchResult) []map[string
 	return out
 }
 
-func knowledgeSearchFilters(userID uuid.UUID, kbIDs []uuid.UUID, tags []string) []any {
-	filters := []any{
-		map[string]any{"term": map[string]any{"user_id": userID.String()}},
-		map[string]any{"terms": map[string]any{"kb_id": uuidStrings(kbIDs)}},
+func knowledgeSearchFilters(userID uuid.UUID, kbIDs []uuid.UUID, tags []string) vectorstore.Filter {
+	conditions := []vectorstore.Condition{
+		vectorstore.Eq("user_id", userID.String()),
+		vectorstore.In("kb_id", uuidStrings(kbIDs)),
 	}
 	cleanTags := cleanSearchTags(tags)
 	if len(cleanTags) != 0 {
-		filters = append(filters, map[string]any{"terms": map[string]any{"tags": cleanTags}})
+		conditions = append(conditions, vectorstore.In("tags", cleanTags))
 	}
-	return filters
+	return vectorstore.Filter{Must: conditions}
 }
 
 // resolveKnowledgeTags 解析知识库标签

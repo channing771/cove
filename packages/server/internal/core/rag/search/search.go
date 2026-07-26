@@ -7,16 +7,19 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/core/valuex"
 )
 
 // Searcher 执行向量召回和 BM25 召回的混合检索。
 //
-// Searcher 不理解业务字段；业务过滤通过 FilterBuilder 或 WithFilters 注入，
-// 业务元数据通过 SourceDecoder 解码到 Output.Source。
+// Searcher 不理解具体存储，也不理解业务字段：稠密召回走 DenseIndex，关键词召回走
+// KeywordIndex；业务过滤通过 FilterBuilder 或 WithFilters 注入，业务元数据通过
+// SourceDecoder 解码到 Output.Source。
 type Searcher[T any] struct {
 	Options
-	es            ESClient
+	dense         vectorstore.DenseIndex
+	keyword       vectorstore.KeywordIndex
 	sourceDecoder SourceDecoder[T]
 }
 
@@ -27,11 +30,11 @@ type NoopSearcher[T any] struct{}
 
 // NewSearcher 创建带默认配置的混合检索器。
 //
-// esClient 或默认 embedder 为 nil 时构造仍会成功，后续 Search 会按请求级配置返回或报错。
-func NewSearcher[T any](esClient ESClient, opts ...Option) *Searcher[T] {
+// dense 或 keyword 为 nil 时构造仍会成功，后续 Search 会返回错误；
+// 这样上层可以在未启用 RAG 时注入占位依赖。
+func NewSearcher[T any](dense vectorstore.DenseIndex, keyword vectorstore.KeywordIndex, opts ...Option) *Searcher[T] {
 	searcher := &Searcher[T]{
 		Options: Options{
-			Index:          defaultIndex,
 			EmbeddingDim:   defaultEmbeddingDim,
 			RecallSize:     defaultRecallSize,
 			VectorWeight:   defaultVectorWeight,
@@ -39,7 +42,8 @@ func NewSearcher[T any](esClient ESClient, opts ...Option) *Searcher[T] {
 			RerankFailOpen: defaultRerankFailOpen,
 			FilterBuilder:  defaultFilterBuilder,
 		},
-		es: esClient,
+		dense:   dense,
+		keyword: keyword,
 	}
 	for _, opt := range opts {
 		opt(&searcher.Options)
@@ -58,8 +62,8 @@ func (NoopSearcher[T]) Search(ctx context.Context, query string, opts ...InputOp
 // Search 执行混合检索：向量召回 + BM25 召回，然后按权重融合排序。
 // 当 MinVectorScore 存在时，先过滤向量相关度不足的候选，再继续融合和重排。
 func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOption) (*SearchResult[T], error) {
-	if s == nil || s.es == nil {
-		return nil, errors.New("rag search ES client is nil")
+	if s == nil || s.dense == nil || s.keyword == nil {
+		return nil, errors.New("rag search stores are nil")
 	}
 
 	req := Input{Query: strings.TrimSpace(query)}
@@ -84,7 +88,7 @@ func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOpt
 		recallSize = req.RecallSize
 	}
 
-	baseFilter, err := s.FilterBuilder(ctx, req)
+	filter, err := s.FilterBuilder(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +98,11 @@ func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOpt
 		return nil, err
 	}
 
-	knnResp, err := s.es.Search(ctx, s.Index, vectorQuery(queryVector, recallSize, s.KnnOversample, baseFilter))
+	denseHits, err := s.dense.Search(ctx, queryVector, recallSize, filter)
 	if err != nil {
 		return nil, err
 	}
-	bm25Resp, err := s.es.Search(ctx, s.Index, bm25Query(req.Query, recallSize, baseFilter))
+	keywordHits, err := s.keyword.Search(ctx, req.Query, recallSize, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +110,8 @@ func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOpt
 	hits := map[string]map[string]any{}
 	vecScores := map[string]float64{}
 	bmScores := map[string]float64{}
-	collectHits(knnResp, hits, vecScores)
-	collectHits(bm25Resp, hits, bmScores)
+	collectHits(denseHits, hits, vecScores)
+	collectHits(keywordHits, hits, bmScores)
 
 	// 向量门槛只负责剔除低相关候选，保留后的候选仍继续参与 BM25 融合和重排。
 	if req.MinVectorScore != nil {
@@ -140,7 +144,7 @@ func (s *Searcher[T]) Search(ctx context.Context, query string, opts ...InputOpt
 
 // resultsForIDs 组装检索结果；命中 child 时优先返回 parent 内容，给上层提供更完整上下文。
 func (s *Searcher[T]) resultsForIDs(ctx context.Context, ids []string, hits map[string]map[string]any, scores map[string]float64, rerankScores map[string]float64) ([]Output[T], error) {
-	// 一次性批量拉取所有命中 child 的 parent 内容，避免逐条 ES 往返(N+1)。
+	// 一次性批量拉取所有命中 child 的 parent 内容，避免逐条往返(N+1)。
 	parentContents := s.fetchParentContents(ctx, ids, hits)
 
 	results := make([]Output[T], 0, len(ids))
@@ -191,7 +195,7 @@ func (s *Searcher[T]) relevanceStatus(req Input, results []Output[T], vecScores 
 		return status
 	}
 
-	// 没有 rerank 分数时，使用 ES knn 原始分数还原出的 cosine 分数。
+	// 没有 rerank 分数时，使用向量 cosine 相似度。
 	if score, ok := maxVectorCosine(results, vecScores); ok {
 		status.Basis = RelevanceBasisVector
 		status.MaxScore = &score
@@ -228,7 +232,7 @@ func maxRerankScore[T any](results []Output[T], rerankScores map[string]float64)
 	return maxScore, ok
 }
 
-// maxVectorCosine 计算 vector 分数最大值。
+// maxVectorCosine 计算 vector cosine 分数最大值。
 func maxVectorCosine[T any](results []Output[T], vecScores map[string]float64) (float64, bool) {
 	if len(vecScores) == 0 {
 		return 0, false
@@ -240,18 +244,12 @@ func maxVectorCosine[T any](results []Output[T], vecScores map[string]float64) (
 		if !exists {
 			continue
 		}
-		cosine := vectorScoreToCosine(score)
-		if !ok || cosine > maxScore {
-			maxScore = cosine
+		if !ok || score > maxScore {
+			maxScore = score
 			ok = true
 		}
 	}
 	return maxScore, ok
-}
-
-// vectorScoreToCosine 将 ES knn cosine 原始分数转换为真实余弦相似度。
-func vectorScoreToCosine(score float64) float64 {
-	return 2*score - 1
 }
 
 // belowThreshold 判断分数是否低于阈值。
@@ -261,8 +259,8 @@ func belowThreshold(score float64, threshold *float64) bool {
 
 // fetchParentContents 批量查询命中 child 的 parent chunk 内容，返回 parentID → content。
 //
-// 用一次 terms 查询取回全部 parent，取代此前每个结果一次 ES 往返的 N+1 模式；
-// 查询失败时返回 nil（调用方回退到 child 自身内容），保持原有 fail-soft 行为。
+// 用一次 Fetch 取回全部 parent，取代此前每个结果一次往返的 N+1 模式；
+// 查询失败时返回 nil（调用方回退到 child 自身内容），保持 fail-soft 行为。
 // 业务隔离过滤由外层调用方负责提供。
 func (s *Searcher[T]) fetchParentContents(ctx context.Context, ids []string, hits map[string]map[string]any) map[string]string {
 	parentIDSet := make(map[string]struct{})
@@ -275,38 +273,29 @@ func (s *Searcher[T]) fetchParentContents(ctx context.Context, ids []string, hit
 		return nil
 	}
 
-	parentIDs := make([]any, 0, len(parentIDSet))
+	parentIDs := make([]string, 0, len(parentIDSet))
 	for parentID := range parentIDSet {
 		parentIDs = append(parentIDs, parentID)
 	}
-	resp, err := s.es.Search(ctx, s.Index, map[string]any{
-		"size": len(parentIDs),
-		"query": map[string]any{
-			"bool": map[string]any{
-				"filter": []any{
-					map[string]any{"terms": map[string]any{"chunk_id": parentIDs}},
-				},
-			},
-		},
-	})
+	fetched, err := s.keyword.Fetch(ctx, vectorstore.Filter{
+		Must: []vectorstore.Condition{vectorstore.In("chunk_id", parentIDs)},
+	}, len(parentIDs))
 	if err != nil {
 		return nil
 	}
 
 	contents := make(map[string]string, len(parentIDs))
-	for _, hit := range responseHits(resp) {
-		parentSrc, _ := hit["_source"].(map[string]any)
-		chunkID := valuex.String(parentSrc["chunk_id"])
+	for _, hit := range fetched {
+		chunkID := valuex.String(hit.Fields["chunk_id"])
 		if chunkID == "" {
 			continue
 		}
-		contents[chunkID] = valuex.String(parentSrc["content"])
+		contents[chunkID] = valuex.String(hit.Fields["content"])
 	}
 	return contents
 }
 
-// filterByMinVectorScore 使用 ES cosine 原始相关度过滤候选。
-// ES cosine knn 的 _score = (1 + cos) / 2，这里需要还原成真实 cosine。
+// filterByMinVectorScore 使用向量 cosine 相似度过滤候选。
 func filterByMinVectorScore(hits map[string]map[string]any, vecScores map[string]float64, bmScores map[string]float64, minScore float64) (map[string]map[string]any, map[string]float64, map[string]float64) {
 	filteredHits := make(map[string]map[string]any, len(hits))
 	filteredVecScores := make(map[string]float64, len(vecScores))
@@ -316,8 +305,7 @@ func filterByMinVectorScore(hits map[string]map[string]any, vecScores map[string
 		if !ok {
 			continue
 		}
-		cos := vectorScoreToCosine(score)
-		if cos < minScore {
+		if score < minScore {
 			continue
 		}
 		filteredHits[id] = src
@@ -360,54 +348,9 @@ func Normalize(scores map[string]float64) map[string]float64 {
 	return out
 }
 
-// defaultFilterBuilder 只透传调用方提供的 ES filter，避免核心包绑定业务字段。
-func defaultFilterBuilder(ctx context.Context, req Input) ([]any, error) {
-	return req.Filters, nil
-}
-
-// vectorQuery 构造 ES knn 查询。
-// knnOversample 为 0 时不写 num_candidates，交给 ES 默认策略处理。
-func vectorQuery(queryVector []float64, recallSize int, knnOversample int, baseFilter []any) map[string]any {
-	boolFilter := map[string]any{"bool": map[string]any{"filter": baseFilter}}
-	knn := map[string]any{
-		"field":        "vector",
-		"query_vector": queryVector,
-		"k":            recallSize,
-		"filter":       boolFilter,
-	}
-	effectiveCandidates := effectiveKnnCandidates(recallSize, knnOversample)
-	if effectiveCandidates > 0 {
-		knn["num_candidates"] = effectiveCandidates
-	}
-	return map[string]any{
-		"size":  recallSize,
-		"query": boolFilter,
-		"knn":   knn,
-	}
-}
-
-func effectiveKnnCandidates(recallSize int, knnOversample int) int {
-	if knnOversample <= 0 {
-		return 0
-	}
-	candidates := recallSize * knnOversample
-	if candidates < recallSize {
-		return recallSize
-	}
-	return candidates
-}
-
-// bm25Query 构造 ES 文本匹配查询，与向量召回共享同一组 filter。
-func bm25Query(query string, recallSize int, baseFilter []any) map[string]any {
-	return map[string]any{
-		"size": recallSize,
-		"query": map[string]any{
-			"bool": map[string]any{
-				"must":   []any{map[string]any{"match": map[string]any{"content": query}}},
-				"filter": baseFilter,
-			},
-		},
-	}
+// defaultFilterBuilder 只透传调用方提供的中立 filter，避免核心包绑定业务字段。
+func defaultFilterBuilder(ctx context.Context, req Input) (vectorstore.Filter, error) {
+	return req.Filter, nil
 }
 
 // fuseScores 向量分数和 BM25 分数融合。
@@ -437,34 +380,19 @@ func rankedIDs(scores map[string]float64, limit int) []string {
 	return ids
 }
 
-// collectHits 收集命中结果。
-func collectHits(resp map[string]any, hits map[string]map[string]any, scores map[string]float64) {
-	for _, hit := range responseHits(resp) {
-		id := valuex.String(hit["_id"])
-		if id == "" {
+// collectHits 把一路召回的中立命中收集到 hits 与 scores 中。
+func collectHits(recalled []vectorstore.Hit, hits map[string]map[string]any, scores map[string]float64) {
+	for _, hit := range recalled {
+		if hit.ID == "" {
 			continue
 		}
-		src, _ := hit["_source"].(map[string]any)
-		if src == nil {
-			src = map[string]any{}
+		fields := hit.Fields
+		if fields == nil {
+			fields = map[string]any{}
 		}
-		hits[id] = src
-		scores[id] = valuex.Float(hit["_score"])
+		hits[hit.ID] = fields
+		scores[hit.ID] = hit.Score
 	}
-}
-
-// responseHits 提取 ES 查询结果中的 hits 部分。
-func responseHits(resp map[string]any) []map[string]any {
-	hitsObj, _ := resp["hits"].(map[string]any)
-	rawHits, _ := hitsObj["hits"].([]any)
-	out := make([]map[string]any, 0, len(rawHits))
-	for _, raw := range rawHits {
-		hit, ok := raw.(map[string]any)
-		if ok {
-			out = append(out, hit)
-		}
-	}
-	return out
 }
 
 func round4(value float64) float64 {

@@ -3,12 +3,10 @@ package document
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"sort"
 	"strings"
@@ -19,14 +17,15 @@ import (
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	ragchunker "github.com/boxify/api-go/internal/core/rag/chunker"
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/core/rag/webcrawl"
 	"github.com/boxify/api-go/internal/domain/types"
-	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/queue"
 	"github.com/boxify/api-go/internal/infrastructure/security"
 	"github.com/boxify/api-go/internal/models"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
+	"github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/transport/http/request"
 	"github.com/boxify/api-go/internal/xerr"
@@ -869,27 +868,64 @@ func TestSearchDocumentsUsesRAGSearchByUserAndTags(t *testing.T) {
 	// 验证文档检索会调用 RAG search，并按 user_id 和 tags 过滤当前用户的全部文档。
 	ctx := context.Background()
 	userID := uuid.New()
+	otherUserID := uuid.New()
 	documentID := uuid.New()
+	otherDocumentID := uuid.New()
 	kbID := uuid.New()
-	var searchBodies []map[string]any
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		if r.Method != http.MethodPost || r.URL.Path != "/boxify_chunks/_search" {
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode search body: %v", err)
-		}
-		searchBodies = append(searchBodies, body)
-		_, _ = w.Write([]byte(`{"hits":{"hits":[{"_id":"11111111-1111-1111-1111-111111111111","_score":2,"_source":{"chunk_id":"11111111-1111-1111-1111-111111111111","source_id":"` + documentID.String() + `","user_id":"` + userID.String() + `","kb_id":"` + kbID.String() + `","name":"guide.md","source_type":"file","content":"hello chunk"}}]}}`))
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
+	// 查询向量与 fake embedder 输出一致，保证目标 chunk 稠密召回得分最高。
+	queryVector := []float64{0.1, 0.2, 0.3}
+
+	mem := memory.New()
+	// 目标 chunk：当前用户、命中标签，应被召回并映射为响应。
+	if err := mem.Upsert(ctx, []vectorstore.Point{{
+		ID:     "11111111-1111-1111-1111-111111111111",
+		Vector: queryVector,
+		Fields: map[string]any{
+			"chunk_id":    "11111111-1111-1111-1111-111111111111",
+			"source_id":   documentID.String(),
+			"user_id":     userID.String(),
+			"kb_id":       kbID.String(),
+			"name":        "guide.md",
+			"source_type": "file",
+			"level":       "parent",
+			"tags":        []string{"重要"},
+			"content":     "hello chunk",
+		},
+	}, {
+		// 隔离用例 1：内容命中但属于其他用户，应被 user_id 过滤掉。
+		ID:     "22222222-2222-2222-2222-222222222222",
+		Vector: queryVector,
+		Fields: map[string]any{
+			"chunk_id":    "22222222-2222-2222-2222-222222222222",
+			"source_id":   otherDocumentID.String(),
+			"user_id":     otherUserID.String(),
+			"kb_id":       kbID.String(),
+			"name":        "other.md",
+			"source_type": "file",
+			"level":       "parent",
+			"tags":        []string{"重要"},
+			"content":     "hello chunk",
+		},
+	}, {
+		// 隔离用例 2：当前用户但标签不匹配，应被 tags 过滤掉。
+		ID:     "33333333-3333-3333-3333-333333333333",
+		Vector: queryVector,
+		Fields: map[string]any{
+			"chunk_id":    "33333333-3333-3333-3333-333333333333",
+			"source_id":   otherDocumentID.String(),
+			"user_id":     userID.String(),
+			"kb_id":       kbID.String(),
+			"name":        "other.md",
+			"source_type": "file",
+			"level":       "parent",
+			"tags":        []string{"其他"},
+			"content":     "hello chunk",
+		},
+	}}); err != nil {
+		t.Fatalf("seed chunks error = %v", err)
 	}
-	ragChunkRepo := repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks")
+
+	ragChunkRepo := ragchunk.NewRepository(mem.Dense(), mem.Keyword())
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -900,7 +936,7 @@ func TestSearchDocumentsUsesRAGSearchByUserAndTags(t *testing.T) {
 	}
 	svcCtx := &svc.ServiceContext{
 		Config:          config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
-		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](esClient, ragsearch.WithIndex("boxify_chunks"), ragsearch.WithEmbeddingDim(3), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
+		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](mem.Dense(), mem.Keyword(), ragsearch.WithEmbeddingDim(3), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
 		ModelConfigRepo: &fakeSearchModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, IsDefault: true}}},
 		SecretCipher:    cipher,
 		LLMManager:      newFakeSearchLLMManager(),
@@ -909,22 +945,12 @@ func TestSearchDocumentsUsesRAGSearchByUserAndTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchDocuments error = %v", err)
 	}
+	// 只应返回当前用户且标签命中的 chunk（隔离掉其他用户与其他标签的记录）。
 	if len(out.List) != 1 || out.List[0].SourceID != documentID || out.List[0].KBID == nil || *out.List[0].KBID != kbID || out.List[0].DocName != "guide.md" {
-		t.Fatalf("SearchDocuments list = %#v, want mapped chunk response", out.List)
+		t.Fatalf("SearchDocuments list = %#v, want mapped chunk response scoped to user_id and tags", out.List)
 	}
-	if len(searchBodies) < 2 {
-		t.Fatalf("ES search calls = %d, want vector and bm25 calls", len(searchBodies))
-	}
-	encoded, err := json.Marshal(searchBodies)
-	if err != nil {
-		t.Fatalf("marshal search bodies: %v", err)
-	}
-	bodyText := string(encoded)
-	if !strings.Contains(bodyText, `"user_id":"`+userID.String()+`"`) || !strings.Contains(bodyText, `"tags":["重要"]`) {
-		t.Fatalf("search filters = %s, want user_id and tags", bodyText)
-	}
-	if strings.Contains(bodyText, `"source_id"`) {
-		t.Fatalf("search filters = %s, want no source_id filter (user-wide search)", bodyText)
+	if out.List[0].Content != "hello chunk" {
+		t.Fatalf("SearchDocuments content = %q, want chunk content", out.List[0].Content)
 	}
 }
 
@@ -932,21 +958,14 @@ func TestSearchDocumentsReturnsErrorWithoutEmbeddingModelConfig(t *testing.T) {
 	// 验证文档检索在用户未配置向量模型时直接返回错误，不访问 ES。
 	ctx := context.Background()
 	userID := uuid.New()
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
 	}
 	svcCtx := &svc.ServiceContext{
 		Config:          config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
-		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](esClient, ragsearch.WithIndex("boxify_chunks"), ragsearch.WithEmbeddingDim(3)),
+		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](mem.Dense(), mem.Keyword(), ragsearch.WithEmbeddingDim(3)),
 		ModelConfigRepo: &fakeSearchModelConfigRepository{},
 		SecretCipher:    cipher,
 		LLMManager:      newFakeSearchLLMManager(),
@@ -962,21 +981,14 @@ func TestSearchDocumentsReturnsErrorWhenEmbeddingAPIKeyDecryptFails(t *testing.T
 	// 验证文档检索在向量模型 API Key 解密失败时返回明确错误。
 	ctx := context.Background()
 	userID := uuid.New()
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
 	}
 	svcCtx := &svc.ServiceContext{
 		Config:      config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
-		RAGSearcher: ragsearch.NewSearcher[models.RAGChunkSource](esClient, ragsearch.WithIndex("boxify_chunks"), ragsearch.WithEmbeddingDim(3)),
+		RAGSearcher: ragsearch.NewSearcher[models.RAGChunkSource](mem.Dense(), mem.Keyword(), ragsearch.WithEmbeddingDim(3)),
 		ModelConfigRepo: &fakeSearchModelConfigRepository{rows: []*models.ModelConfig{{
 			UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: "not-encrypted", IsDefault: true,
 		}}},

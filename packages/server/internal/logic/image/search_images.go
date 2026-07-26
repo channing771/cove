@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/observability/xlog"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/transport/http/request"
@@ -76,9 +77,9 @@ func (l *SearchImagesLogic) SearchImages(userID uuid.UUID, input *request.Search
 	return &response.ListResponse[*response.SearchImageResponse]{List: out}, nil
 }
 
-func imageSearchFilters(userID uuid.UUID) []any {
-	return []any{
-		map[string]any{"term": map[string]any{"user_id": userID.String()}},
-		map[string]any{"term": map[string]any{"source_type": "image"}},
-	}
+func imageSearchFilters(userID uuid.UUID) vectorstore.Filter {
+	return vectorstore.Filter{Must: []vectorstore.Condition{
+		vectorstore.Eq("user_id", userID.String()),
+		vectorstore.Eq("source_type", "image"),
+	}}
 }

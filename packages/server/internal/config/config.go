@@ -17,6 +17,7 @@ type Config struct {
 	Database      DatabaseConfig      `yaml:"database"`
 	Redis         RedisConfig         `yaml:"redis"`
 	Elasticsearch ElasticsearchConfig `yaml:"elasticsearch"`
+	Qdrant        QdrantConfig        `yaml:"qdrant"`
 	Neo4j         Neo4jConfig         `yaml:"neo4j"`
 	JWT           JWTConfig           `yaml:"jwt"`
 	SecretKey     string              `yaml:"secret_key"`
@@ -63,6 +64,16 @@ type ElasticsearchConfig struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
 	APIKey   string `yaml:"api_key"`
+}
+
+// QdrantConfig 配置稠密向量存储 Qdrant。
+//
+// Addr 为 gRPC 地址（host:port，默认端口 6334）；Collection 为向量集合名。
+type QdrantConfig struct {
+	Addr       string `yaml:"addr"`
+	APIKey     string `yaml:"api_key"`
+	Collection string `yaml:"collection"`
+	UseTLS     bool   `yaml:"use_tls"`
 }
 
 type Neo4jConfig struct {
@@ -203,6 +214,7 @@ func defaultConfig() Config {
 		Database:      DatabaseConfig{URL: "postgres://cove:cove@localhost:5432/cove?sslmode=disable"},
 		Redis:         RedisConfig{Addr: "localhost:6379"},
 		Elasticsearch: ElasticsearchConfig{URL: "http://localhost:9200"},
+		Qdrant:        QdrantConfig{Addr: "localhost:6334", Collection: "cove_chunks"},
 		Neo4j:         Neo4jConfig{URI: "bolt://localhost:7687"},
 		JWT:           JWTConfig{Secret: "change-me", AccessTokenTTL: "168h"},
 		SecretKey:     "0123456789abcdef0123456789abcdef",
@@ -262,6 +274,9 @@ func applyEnv(cfg *Config) {
 	cfg.Elasticsearch.Username = env("ES_USERNAME", cfg.Elasticsearch.Username)
 	cfg.Elasticsearch.Password = env("ES_PASSWORD", cfg.Elasticsearch.Password)
 	cfg.Elasticsearch.APIKey = env("ES_API_KEY", cfg.Elasticsearch.APIKey)
+	cfg.Qdrant.Addr = env("QDRANT_ADDR", cfg.Qdrant.Addr)
+	cfg.Qdrant.APIKey = env("QDRANT_API_KEY", cfg.Qdrant.APIKey)
+	cfg.Qdrant.Collection = env("QDRANT_COLLECTION", cfg.Qdrant.Collection)
 	cfg.Neo4j.URI = env("NEO4J_URI", cfg.Neo4j.URI)
 	cfg.Neo4j.Username = env("NEO4J_USERNAME", cfg.Neo4j.Username)
 	cfg.Neo4j.Password = env("NEO4J_PASSWORD", cfg.Neo4j.Password)

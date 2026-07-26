@@ -2,11 +2,8 @@ package tasks
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -16,17 +13,54 @@ import (
 	ragchunker "github.com/boxify/api-go/internal/core/rag/chunker"
 	ragclassifier "github.com/boxify/api-go/internal/core/rag/classifier"
 	ragparser "github.com/boxify/api-go/internal/core/rag/documentparse"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/domain/types"
-	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/security"
 	"github.com/boxify/api-go/internal/models"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
+	"github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/xerr"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 )
+
+// recordingKeyword 包装 vectorstore.KeywordIndex，用于在测试中记录标签同步（SetFields）
+// 调用顺序，并可注入错误以模拟关键词存储写入失败。
+type recordingKeyword struct {
+	vectorstore.KeywordIndex
+	events       *[]string
+	setFieldsErr error
+}
+
+func (r *recordingKeyword) SetFields(ctx context.Context, filter vectorstore.Filter, fields map[string]any) error {
+	if r.events != nil {
+		*r.events = append(*r.events, "es:update_tags")
+	}
+	if r.setFieldsErr != nil {
+		return r.setFieldsErr
+	}
+	return r.KeywordIndex.SetFields(ctx, filter, fields)
+}
+
+// fetchChunks 按来源实体 ID 从内存存储取回全部已写入的 chunk 字段。
+func fetchChunks(t *testing.T, mem *memory.Store, sourceID uuid.UUID) []vectorstore.Hit {
+	t.Helper()
+	hits, err := mem.Keyword().Fetch(context.Background(), vectorstore.Filter{
+		Must: []vectorstore.Condition{vectorstore.Eq("source_id", sourceID.String())},
+	}, 100)
+	if err != nil {
+		t.Fatalf("fetch chunks error = %v", err)
+	}
+	return hits
+}
+
+// chunkTagSlice 把命中字段中的 tags 解析成字符串切片。
+func chunkTagSlice(fields map[string]any) []string {
+	tags, _ := fields["tags"].([]string)
+	return tags
+}
 
 type fakeDocumentRepository struct {
 	rows   map[uuid.UUID]*models.Document
@@ -337,44 +371,8 @@ func TestHandleParseDocumentProcessesTextDocument(t *testing.T) {
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending", Tags: []models.Tag{{Name: "手动"}}}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello async queue")
-	var createdIndex map[string]any
-	indexedDocs := map[string]map[string]any{}
-	var updateTagsBody map[string]any
 	var events []string
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusNotFound)
-		case r.Method == http.MethodPut && r.URL.Path == "/boxify_chunks":
-			if err := json.NewDecoder(r.Body).Decode(&createdIndex); err != nil {
-				t.Fatalf("decode create index body: %v", err)
-			}
-			_, _ = w.Write([]byte(`{"acknowledged":true}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_update_by_query":
-			events = append(events, "es:update_tags")
-			if err := json.NewDecoder(r.Body).Decode(&updateTagsBody); err != nil {
-				t.Fatalf("decode update tags body: %v", err)
-			}
-			_, _ = w.Write([]byte(`{"updated":1}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			var body map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode indexed chunk body: %v", err)
-			}
-			indexedDocs[strings.TrimPrefix(r.URL.Path, "/boxify_chunks/_doc/")] = body
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -395,8 +393,7 @@ func TestHandleParseDocumentProcessesTextDocument(t *testing.T) {
 		ModelConfigRepo:   &fakeModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}, {UserID: userID, Type: string(types.ChatModelType), Provider: "fake", ModelName: "db-chat", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}}},
 		SecretCipher:      cipher,
 		Storage:           store,
-		Elasticsearch:     esClient,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), &recordingKeyword{KeywordIndex: mem.Keyword(), events: &events}),
 		RAGClassifier:     ragclassifier.NewClassifier(),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
@@ -420,10 +417,8 @@ func TestHandleParseDocumentProcessesTextDocument(t *testing.T) {
 	if tagRepo.syncedUserID != userID || tagRepo.syncedDocumentID != documentID || !slices.Equal(tagRepo.syncedNames, []string{"手动", "自动"}) {
 		t.Fatalf("synced tags user=%s document=%s names=%v, want merged manual and classified tags", tagRepo.syncedUserID, tagRepo.syncedDocumentID, tagRepo.syncedNames)
 	}
-	if createdIndex == nil {
-		t.Fatal("created index body = nil, want mapping initialization")
-	}
-	if len(indexedDocs) == 0 {
+	chunks := fetchChunks(t, mem, documentID)
+	if len(chunks) == 0 {
 		t.Fatal("indexed chunks = 0, want at least one chunk written")
 	}
 	if len(llmConfigs) < 2 || llmConfigs[0].Provider != "fake" || llmConfigs[0].Model != "db-embed" || llmConfigs[0].EmbeddingModel != "db-embed" || llmConfigs[0].APIKey != "db-key" || llmConfigs[0].BaseURL != "https://llm.example" || llmConfigs[1].Model != "db-chat" {
@@ -432,15 +427,33 @@ func TestHandleParseDocumentProcessesTextDocument(t *testing.T) {
 	if len(embeddingOptions) != 1 || embeddingOptions[0].BatchSize != 4 {
 		t.Fatalf("embedding options = %#v, want batch size 4 from rag config", embeddingOptions)
 	}
-	encodedUpdate, _ := json.Marshal(updateTagsBody)
-	updateText := string(encodedUpdate)
-	if !strings.Contains(updateText, `"手动"`) || !strings.Contains(updateText, `"自动"`) || strings.Count(updateText, "手动") != 1 {
-		t.Fatalf("update tags body = %s, want merged unique manual and classified tags", updateText)
-	}
-	for _, body := range indexedDocs {
-		if body["source_id"] != documentID.String() || body["user_id"] != userID.String() || body["content"] == "" || body["vector"] == nil {
-			t.Fatalf("indexed chunk body = %#v, want source/user/content/vector", body)
+	for _, hit := range chunks {
+		if hit.Fields["source_id"] != documentID.String() || hit.Fields["user_id"] != userID.String() || hit.Fields["content"] == "" {
+			t.Fatalf("indexed chunk fields = %#v, want source/user/content", hit.Fields)
 		}
+		tags := chunkTagSlice(hit.Fields)
+		if !slices.Contains(tags, "手动") || !slices.Contains(tags, "自动") {
+			t.Fatalf("chunk tags = %#v, want merged manual and classified tags", hit.Fields["tags"])
+		}
+		manualCount := 0
+		for _, tag := range tags {
+			if tag == "手动" {
+				manualCount++
+			}
+		}
+		if manualCount != 1 {
+			t.Fatalf("chunk tags = %#v, want unique 手动", hit.Fields["tags"])
+		}
+	}
+	// 稠密检索命中即证明向量已写入共享内存存储。
+	denseHits, err := mem.Dense().Search(ctx, []float64{0.1, 0.2, 0.3}, 100, vectorstore.Filter{
+		Must: []vectorstore.Condition{vectorstore.Eq("source_id", documentID.String())},
+	})
+	if err != nil {
+		t.Fatalf("dense search error = %v", err)
+	}
+	if len(denseHits) == 0 {
+		t.Fatal("dense hits = 0, want vectors written to store")
 	}
 }
 
@@ -452,14 +465,7 @@ func TestHandleParseDocumentMarksFailedWhenEmbeddingConfigMissing(t *testing.T) 
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending"}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello world")
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -471,7 +477,7 @@ func TestHandleParseDocumentMarksFailedWhenEmbeddingConfigMissing(t *testing.T) 
 		ModelConfigRepo:   &fakeModelConfigRepository{},
 		SecretCipher:      cipher,
 		Storage:           store,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
 		LLMManager:        newFakeLLMManager(fakeLLMClient{}),
@@ -487,6 +493,9 @@ func TestHandleParseDocumentMarksFailedWhenEmbeddingConfigMissing(t *testing.T) 
 	if row.Status != "failed" || row.ErrorMsg == nil || !strings.Contains(*row.ErrorMsg, "未配置向量模型") {
 		t.Fatalf("document after missing embedding config = %+v, want failed missing config", row)
 	}
+	if hits := fetchChunks(t, mem, documentID); len(hits) != 0 {
+		t.Fatalf("indexed chunks = %d, want none when embedding config missing", len(hits))
+	}
 }
 
 func TestHandleParseDocumentCompletesWhenChatConfigMissing(t *testing.T) {
@@ -497,30 +506,7 @@ func TestHandleParseDocumentCompletesWhenChatConfigMissing(t *testing.T) {
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending", Tags: []models.Tag{{Name: "手动"}}}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello world")
-	var updateTagsBody map[string]any
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusOK)
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_update_by_query":
-			if err := json.NewDecoder(r.Body).Decode(&updateTagsBody); err != nil {
-				t.Fatalf("decode update tags body: %v", err)
-			}
-			_, _ = w.Write([]byte(`{"updated":1}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -537,7 +523,7 @@ func TestHandleParseDocumentCompletesWhenChatConfigMissing(t *testing.T) {
 		ModelConfigRepo:   &fakeModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}}},
 		SecretCipher:      cipher,
 		Storage:           store,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGClassifier:     ragclassifier.NewClassifier(),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
@@ -554,9 +540,14 @@ func TestHandleParseDocumentCompletesWhenChatConfigMissing(t *testing.T) {
 	if row.Status != "done" || row.Progress != 1 || row.ErrorMsg != nil {
 		t.Fatalf("document after missing chat config = %+v, want done", row)
 	}
-	encoded, _ := json.Marshal(updateTagsBody)
-	if text := string(encoded); !strings.Contains(text, `"手动"`) {
-		t.Fatalf("update tags body = %s, want existing document tag", text)
+	chunks := fetchChunks(t, mem, documentID)
+	if len(chunks) == 0 {
+		t.Fatal("indexed chunks = 0, want chunks written")
+	}
+	for _, hit := range chunks {
+		if !slices.Contains(chunkTagSlice(hit.Fields), "手动") {
+			t.Fatalf("chunk tags = %#v, want existing document tag", hit.Fields["tags"])
+		}
 	}
 	if !slices.Equal(tagRepo.syncedNames, []string{"手动"}) {
 		t.Fatalf("synced tags = %v, want existing document tag", tagRepo.syncedNames)
@@ -571,27 +562,7 @@ func TestHandleParseDocumentMarksFailedWhenUpdateTagsFails(t *testing.T) {
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending"}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello world")
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusOK)
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_update_by_query":
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte(`{"error":"update failed"}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -600,6 +571,7 @@ func TestHandleParseDocumentMarksFailedWhenUpdateTagsFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt API key error = %v", err)
 	}
+	keyword := &recordingKeyword{KeywordIndex: mem.Keyword(), setFieldsErr: errors.New("更新 chunk 标签失败")}
 	handler := NewParseDocumentTask(&svc.ServiceContext{
 		Config:            config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
 		DocumentRepo:      newFakeDocumentRepository(row),
@@ -607,7 +579,7 @@ func TestHandleParseDocumentMarksFailedWhenUpdateTagsFails(t *testing.T) {
 		ModelConfigRepo:   &fakeModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}, {UserID: userID, Type: string(types.ChatModelType), Provider: "fake", ModelName: "db-chat", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}}},
 		SecretCipher:      cipher,
 		Storage:           store,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), keyword),
 		RAGClassifier:     ragclassifier.NewClassifier(),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
@@ -621,8 +593,8 @@ func TestHandleParseDocumentMarksFailedWhenUpdateTagsFails(t *testing.T) {
 	if err := handler.Handle(ctx, task); err != nil {
 		t.Fatalf("HandleParseDocument error = %v", err)
 	}
-	if row.Status != "failed" || row.Progress != 0.8 || row.ErrorMsg == nil || !strings.Contains(*row.ErrorMsg, "批量更新 Elasticsearch 文档失败") {
-		t.Fatalf("document after update tags failure = %+v, want failed progress=0.8 ES update error", row)
+	if row.Status != "failed" || row.Progress != 0.8 || row.ErrorMsg == nil || !strings.Contains(*row.ErrorMsg, "更新 chunk 标签失败") {
+		t.Fatalf("document after update tags failure = %+v, want failed progress=0.8 chunk tag update error", row)
 	}
 }
 
@@ -634,26 +606,8 @@ func TestHandleParseDocumentMarksFailedWhenSyncDocumentTagsFails(t *testing.T) {
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending"}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello world")
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		switch {
-		case r.Method == http.MethodHead && r.URL.Path == "/boxify_chunks":
-			w.WriteHeader(http.StatusOK)
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_delete_by_query":
-			_, _ = w.Write([]byte(`{"deleted":0}`))
-		case r.Method == http.MethodPut && strings.HasPrefix(r.URL.Path, "/boxify_chunks/_doc/"):
-			_, _ = w.Write([]byte(`{"result":"created"}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/boxify_chunks/_update_by_query":
-			t.Fatalf("unexpected ES tag update after PG sync failure")
-		default:
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
+	var events []string
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -662,6 +616,7 @@ func TestHandleParseDocumentMarksFailedWhenSyncDocumentTagsFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt API key error = %v", err)
 	}
+	keyword := &recordingKeyword{KeywordIndex: mem.Keyword(), events: &events}
 	handler := NewParseDocumentTask(&svc.ServiceContext{
 		Config:            config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
 		DocumentRepo:      newFakeDocumentRepository(row),
@@ -669,7 +624,7 @@ func TestHandleParseDocumentMarksFailedWhenSyncDocumentTagsFails(t *testing.T) {
 		ModelConfigRepo:   &fakeModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}, {UserID: userID, Type: string(types.ChatModelType), Provider: "fake", ModelName: "db-chat", APIKeyEncrypted: encryptedAPIKey, BaseURL: "https://llm.example", IsDefault: true}}},
 		SecretCipher:      cipher,
 		Storage:           store,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), keyword),
 		RAGClassifier:     ragclassifier.NewClassifier(),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
@@ -686,6 +641,9 @@ func TestHandleParseDocumentMarksFailedWhenSyncDocumentTagsFails(t *testing.T) {
 	if row.Status != "failed" || row.Progress != 0.8 || row.ErrorMsg == nil || !strings.Contains(*row.ErrorMsg, "pg sync failed") {
 		t.Fatalf("document after PG sync failure = %+v, want failed progress=0.8 PG error", row)
 	}
+	if slices.Contains(events, "es:update_tags") {
+		t.Fatalf("events = %v, want no chunk tag update after PG sync failure", events)
+	}
 }
 
 func TestHandleParseDocumentMarksFailedWhenEmbeddingAPIKeyDecryptFails(t *testing.T) {
@@ -696,14 +654,7 @@ func TestHandleParseDocumentMarksFailedWhenEmbeddingAPIKeyDecryptFails(t *testin
 	row := &models.Document{ID: documentID, UserID: userID, FileName: "a.txt", FileExt: ".txt", FileKey: "docs/a.txt", Status: "pending"}
 	store := newMemoryStore()
 	store.data[row.FileKey] = []byte("hello world")
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
+	mem := memory.New()
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -717,7 +668,7 @@ func TestHandleParseDocumentMarksFailedWhenEmbeddingAPIKeyDecryptFails(t *testin
 		}}},
 		SecretCipher:      cipher,
 		Storage:           store,
-		RAGChunkRepo:      repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks"),
+		RAGChunkRepo:      ragchunk.NewRepository(mem.Dense(), mem.Keyword()),
 		RAGDocumentParser: ragparser.NewParser(),
 		RAGChunker:        ragchunker.NewChunker(ragchunker.WithParentChunkTokens(1200)),
 		LLMManager:        newFakeLLMManager(fakeLLMClient{}),

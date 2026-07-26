@@ -3,27 +3,24 @@ package image
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"mime/multipart"
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/boxify/api-go/internal/config"
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	ragchunker "github.com/boxify/api-go/internal/core/rag/chunker"
 	ragsearch "github.com/boxify/api-go/internal/core/rag/search"
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
 	"github.com/boxify/api-go/internal/domain/types"
-	infraes "github.com/boxify/api-go/internal/infrastructure/db/es"
+	"github.com/boxify/api-go/internal/infrastructure/db/memory"
 	"github.com/boxify/api-go/internal/infrastructure/queue"
 	"github.com/boxify/api-go/internal/infrastructure/security"
 	"github.com/boxify/api-go/internal/models"
 	"github.com/boxify/api-go/internal/repository"
-	repositoryes "github.com/boxify/api-go/internal/repository/es"
+	"github.com/boxify/api-go/internal/repository/ragchunk"
 	"github.com/boxify/api-go/internal/svc"
 	"github.com/boxify/api-go/internal/transport/http/request"
 	"github.com/boxify/api-go/internal/xerr"
@@ -696,31 +693,47 @@ func TestMoveImageValidatesTargetKnowledgeBaseAndUpdatesOnlyKBID(t *testing.T) {
 	}
 }
 
+// seedImageChunk 向内存存储写入一条 chunk（稠密 + 关键词共享底层数据）。
+// 稠密视图按 cosine 打分，向量取伪 embedder 的查询输出 [0.1,0.2,0.3] 保证命中最相关；
+// 关键词视图按 content 中出现的查询词打分。
+func seedImageChunk(t *testing.T, mem *memory.Store, chunkID, sourceID, userID, kbID, sourceType, content string) {
+	t.Helper()
+	fields := map[string]any{
+		"chunk_id":    chunkID,
+		"source_id":   sourceID,
+		"user_id":     userID,
+		"name":        "cat.png",
+		"source_type": sourceType,
+		"content":     content,
+		"level":       "parent",
+		"tags":        []string{},
+	}
+	if kbID != "" {
+		fields["kb_id"] = kbID
+	}
+	point := vectorstore.Point{ID: chunkID, Vector: []float64{0.1, 0.2, 0.3}, Fields: fields}
+	if err := mem.Upsert(context.Background(), []vectorstore.Point{point}); err != nil {
+		t.Fatalf("seed chunk: %v", err)
+	}
+}
+
 // 验证图片检索会调用 RAG search，并按 user_id 与 source_type=image 过滤。
 func TestSearchImagesUsesRAGSearchByUserAndSourceType(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
+	otherUserID := uuid.New()
 	imageID := uuid.New()
 	kbID := uuid.New()
-	var searchBodies []map[string]any
-	esServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Elastic-Product", "Elasticsearch")
-		if r.Method != http.MethodPost || r.URL.Path != "/boxify_chunks/_search" {
-			t.Fatalf("unexpected ES request %s %s", r.Method, r.URL.Path)
-		}
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("decode search body: %v", err)
-		}
-		searchBodies = append(searchBodies, body)
-		_, _ = w.Write([]byte(`{"hits":{"hits":[{"_id":"11111111-1111-1111-1111-111111111111","_score":2,"_source":{"chunk_id":"11111111-1111-1111-1111-111111111111","source_id":"` + imageID.String() + `","user_id":"` + userID.String() + `","kb_id":"` + kbID.String() + `","name":"cat.png","source_type":"image","content":"a cat"}}]}}`))
-	}))
-	defer esServer.Close()
-	esClient, err := infraes.NewClient(infraes.Config{URL: esServer.URL})
-	if err != nil {
-		t.Fatalf("NewClient error = %v", err)
-	}
-	ragChunkRepo := repositoryes.NewRAGChunkRepository(esClient, "boxify_chunks")
+
+	mem := memory.New()
+	ragChunkRepo := ragchunk.NewRepository(mem.Dense(), mem.Keyword())
+	// 目标图片 chunk：属于当前用户、source_type=image，应被检索命中。
+	seedImageChunk(t, mem, uuid.NewString(), imageID.String(), userID.String(), kbID.String(), "image", "a cat")
+	// 干扰项：内容相同但属于其他用户，应被 user_id 过滤剔除。
+	seedImageChunk(t, mem, uuid.NewString(), uuid.NewString(), otherUserID.String(), kbID.String(), "image", "a cat")
+	// 干扰项：属于当前用户但 source_type=document，应被 source_type 过滤剔除。
+	seedImageChunk(t, mem, uuid.NewString(), uuid.NewString(), userID.String(), kbID.String(), "document", "a cat")
+
 	cipher, err := security.NewSecretCipher("0123456789abcdef0123456789abcdef")
 	if err != nil {
 		t.Fatalf("NewSecretCipher error = %v", err)
@@ -730,8 +743,7 @@ func TestSearchImagesUsesRAGSearchByUserAndSourceType(t *testing.T) {
 		t.Fatalf("Encrypt API key error = %v", err)
 	}
 	svcCtx := &svc.ServiceContext{
-		Config:          config.Config{Rag: config.RagConfig{EmbeddingDim: 3, ChunkIndex: "boxify_chunks"}},
-		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](esClient, ragsearch.WithIndex("boxify_chunks"), ragsearch.WithEmbeddingDim(3), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
+		RAGSearcher:     ragsearch.NewSearcher[models.RAGChunkSource](mem.Dense(), mem.Keyword(), ragsearch.WithEmbeddingDim(3), ragsearch.WithSourceDecoder[models.RAGChunkSource](ragChunkRepo.DecodeSource)),
 		ModelConfigRepo: &fakeSearchModelConfigRepository{rows: []*models.ModelConfig{{UserID: userID, Type: string(types.EmbeddingModelType), Provider: "fake", ModelName: "db-embed", APIKeyEncrypted: encryptedAPIKey, IsDefault: true}}},
 		SecretCipher:    cipher,
 		LLMManager:      newFakeSearchLLMManager(),
@@ -740,19 +752,12 @@ func TestSearchImagesUsesRAGSearchByUserAndSourceType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchImages error = %v", err)
 	}
+	// 只应返回当前用户的 image chunk：user_id 与 source_type=image 过滤共同生效。
 	if len(out.List) != 1 || out.List[0].SourceID != imageID || out.List[0].KBID == nil || *out.List[0].KBID != kbID || out.List[0].ImageName != "cat.png" {
-		t.Fatalf("SearchImages list = %#v, want mapped chunk response", out.List)
+		t.Fatalf("SearchImages list = %#v, want only current user's image chunk", out.List)
 	}
-	if len(searchBodies) < 2 {
-		t.Fatalf("ES search calls = %d, want vector and bm25 calls", len(searchBodies))
-	}
-	encoded, err := json.Marshal(searchBodies)
-	if err != nil {
-		t.Fatalf("marshal search bodies: %v", err)
-	}
-	bodyText := string(encoded)
-	if !strings.Contains(bodyText, `"user_id":"`+userID.String()+`"`) || !strings.Contains(bodyText, `"source_type":"image"`) {
-		t.Fatalf("search filters = %s, want user_id and source_type image", bodyText)
+	if out.List[0].SourceType != "image" || out.List[0].Content != "a cat" {
+		t.Fatalf("SearchImages hit = %#v, want image source type and content", out.List[0])
 	}
 }
 

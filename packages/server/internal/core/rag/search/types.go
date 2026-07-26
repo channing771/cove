@@ -2,12 +2,9 @@ package search
 
 import (
 	"context"
-)
 
-// ESClient 定义检索器需要的最小 Elasticsearch 查询能力。
-type ESClient interface {
-	Search(ctx context.Context, index string, query any) (map[string]any, error)
-}
+	"github.com/boxify/api-go/internal/core/rag/vectorstore"
+)
 
 // Embedder 定义单文本向量化能力。
 type Embedder interface {
@@ -22,21 +19,21 @@ type Reranker interface {
 	Rerank(ctx context.Context, query string, documents []string, topN int) ([]RerankResult, error)
 }
 
-// FilterBuilder 根据请求构造 ES filter。
+// FilterBuilder 根据请求构造中立过滤条件。
 //
-// 返回的 filter 会同时用于向量召回和 BM25 召回；业务过滤规则由调用方自行实现。
-type FilterBuilder func(ctx context.Context, req Input) ([]any, error)
+// 返回的 filter 会同时用于向量召回和关键词召回；业务过滤规则由调用方自行实现。
+type FilterBuilder func(ctx context.Context, req Input) (vectorstore.Filter, error)
 
-// SourceDecoder 把 ES _source 解码成调用方需要的类型。
+// SourceDecoder 把命中记录的中立字段解码成调用方需要的类型。
 //
 // decoder 返回错误时 Search 会终止并返回该错误，避免静默丢失业务元数据。
-type SourceDecoder[T any] func(src map[string]any) (T, error)
+type SourceDecoder[T any] func(fields map[string]any) (T, error)
 
-// RerankDocumentBuilder 根据 ES _source 构造送入 reranker 的文档文本。
+// RerankDocumentBuilder 根据命中记录的中立字段构造送入 reranker 的文档文本。
 //
 // 默认实现读取 content 字段。调用方可以覆盖为标题、摘要和结构化元数据拼接后的文本；
 // builder 返回空字符串时仍会把该候选传给 reranker，由具体 reranker 适配器决定如何处理。
-type RerankDocumentBuilder func(src map[string]any) string
+type RerankDocumentBuilder func(fields map[string]any) string
 
 // RerankResult 表示重排模型返回的候选下标和分数。
 type RerankResult struct {
@@ -49,14 +46,14 @@ type RerankResult struct {
 // Input 描述一次 RAG 检索请求的内部配置。
 //
 // RecallSize 控制两路召回池大小，最终仍由 TopK 裁剪。
-// Filters 会透传给向量召回和 BM25 召回，业务过滤规则由调用方提供。
-// MinVectorScore 启用后按 ES cosine 原始相关度门控，适合精确搜索场景。
+// Filter 会透传给向量召回和关键词召回，业务过滤规则由调用方提供。
+// MinVectorScore 启用后按向量 cosine 相似度门控，适合精确搜索场景。
 // 其余未导出字段由 InputOption 写入，用于覆盖默认 embedder 和 rerank 配置。
 type Input struct {
 	Query          string
 	TopK           int
 	RecallSize     int
-	Filters        []any
+	Filter         vectorstore.Filter
 	MinVectorScore *float64
 	embedder       Embedder
 	reranker       Reranker
@@ -90,10 +87,10 @@ func WithInputRecallSize(recallSize int) InputOption {
 	}
 }
 
-// WithFilters 设置单次请求要透传给 ES 的 filter。
-func WithFilters(filters []any) InputOption {
+// WithFilters 设置单次请求要透传给存储的中立过滤条件。
+func WithFilters(filter vectorstore.Filter) InputOption {
 	return func(req *Input) {
-		req.Filters = filters
+		req.Filter = filter
 	}
 }
 
@@ -195,7 +192,7 @@ func WithInputRerankDocumentBuilder(builder RerankDocumentBuilder) InputOption {
 
 // Output 表示一次检索命中的通用结果。
 //
-// ID 是 ES hit 的 _id，Content 优先使用 parent chunk 内容，Score 是第一阶段融合分。
+// ID 是命中记录的 id，Content 优先使用 parent chunk 内容，Score 是第一阶段融合分。
 // RerankScore 仅在重排成功且该结果有重排分数时填充，Source 是调用方 decoder 的输出。
 type Output[T any] struct {
 	ID          string

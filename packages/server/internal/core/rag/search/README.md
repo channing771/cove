@@ -87,7 +87,7 @@ type RelevanceStatus struct {
 }
 ```
 
-`Relevance.Low` 表示最终结果整体相关度低于调用方指定阈值。该状态优先使用最终结果中的最高 rerank 分数；没有 rerank 分数时，使用 ES knn `_score` 还原出的最高 cosine 分数。不要用 `Output.Score` 判定低相关，因为它是归一化后的融合分。
+`Relevance.Low` 表示最终结果整体相关度低于调用方指定阈值。该状态优先使用最终结果中的最高 rerank 分数；没有 rerank 分数时，使用稠密召回返回的最高 cosine 相似度（`DenseIndex.Search` 约定 `Hit.Score` 即 cosine）。不要用 `Output.Score` 判定低相关，因为它是归一化后的融合分。
 
 ## Configuration
 
@@ -124,7 +124,7 @@ WithInputLowRelevanceThreshold(score float64)
 4. 默认 `failOpen=true`。
 5. 默认 rerank window 使用 `max(topK, recallSize)`。
 6. 默认 rerank topK 使用最终 `topK`。
-7. 默认 document builder 读取 `_source["content"]`。
+7. 默认 document builder 读取命中字段中的 `content`。
 8. 低相关阈值未配置时，`Low=false`，但仍尽量填充 `Basis` 和 `MaxScore`。
 
 ## Implementation Structure
