@@ -1,8 +1,8 @@
-// Package prompt 内置记忆流程的默认提示词模板与模板参数结构。
+// Package prompt 内置记忆流程的默认提示词模板资源。
 //
-// 与 rag/prompt 一致：本包只声明模板文件与模板变量，读取/渲染交给 core/prompt。
-// 模块自带模板意味着 core/memory 无需外部注入 Prompter。本包不依赖 core/memory，
-// 避免与其形成 import 环。
+// 与 rag/prompt 一致：本包只声明模板文件与模板名称，读取/渲染交给 core/prompt。
+// 模板变量直接由 core/memory 的领域输入类型（StatementPromptInput 等）提供，
+// 因此本包不再重复声明参数结构，也不依赖 core/memory，避免 import 环。
 package prompt
 
 import "embed"
@@ -22,53 +22,3 @@ const (
 	// CommunityMetadataTemplate 社区名称与摘要生成模板文件名。
 	CommunityMetadataTemplate = "generate_community_metadata.tmpl"
 )
-
-// StatementExtractData 约束原子陈述抽取模板可用变量。
-type StatementExtractData struct {
-	Content string
-	Context string
-}
-
-// TripletExtractData 约束实体与三元组抽取模板可用变量。
-type TripletExtractData struct {
-	Statement   string
-	Context     string
-	EntityTypes []string
-	Predicates  []string
-	ValidAt     string
-	InvalidAt   string
-	DialogAt    string
-}
-
-// DedupEntityData 约束实体去重模板可用变量。
-type DedupEntityData struct {
-	EntityA DedupEntitySide
-	EntityB DedupEntitySide
-	Context DedupSimilarity
-}
-
-// DedupEntitySide 表示去重判断中的一个候选实体。
-type DedupEntitySide struct {
-	Name        string
-	Type        string
-	Description string
-	Aliases     []string
-}
-
-// DedupSimilarity 表示去重判断的相似度特征（模板按字符串渲染）。
-type DedupSimilarity struct {
-	NameTextSim  string
-	NameEmbedSim string
-	NameContains string
-}
-
-// CommunityMetadataData 约束社区元数据生成模板可用变量。
-type CommunityMetadataData struct {
-	Members []CommunityMetadataMember
-}
-
-// CommunityMetadataMember 表示社区摘要中的一个成员。
-type CommunityMetadataMember struct {
-	Name        string
-	Description string
-}

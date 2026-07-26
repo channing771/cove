@@ -40,72 +40,22 @@ type LabelPropagationEngine struct {
 	memoryRepo    memory.GraphStore
 }
 
-// Option 配置 LabelPropagationEngine。
-type Option func(*LabelPropagationEngine)
-
-// WithConfig 设置 memory 调参项。
-func WithConfig(cfg memory.Config) Option {
-	return func(e *LabelPropagationEngine) { e.cfg = cfg }
-}
-
-// WithLLM 设置社区元数据生成使用的模型客户端。
-func WithLLM(client llm.Client) Option {
-	return func(e *LabelPropagationEngine) { e.llm = client }
-}
-
-// WithCommunityStore 设置社区存储端口。
-func WithCommunityStore(community memory.CommunityStore) Option {
-	return func(e *LabelPropagationEngine) { e.communityRepo = community }
-}
-
-// WithGraphStore 设置图存储端口。
-func WithGraphStore(graph memory.GraphStore) Option {
-	return func(e *LabelPropagationEngine) { e.memoryRepo = graph }
-}
-
-// WithIDGenerator 设置 ID 生成器。
-func WithIDGenerator(generator id.Generator) Option {
-	return func(e *LabelPropagationEngine) { e.id = generator }
-}
-
-// WithJSONParser 设置 LLM 输出的 JSON 解析器。
-func WithJSONParser(parser jsonx.Parser) Option {
-	return func(e *LabelPropagationEngine) { e.jsonParser = parser }
-}
-
-// WithPrompter 覆盖默认内置提示词实现；传 nil 时忽略。
-func WithPrompter(prompter memory.Prompter) Option {
-	return func(e *LabelPropagationEngine) {
-		if prompter != nil {
-			e.prompt = prompter
-		}
-	}
-}
-
-// WithLogger 注入日志器；传 nil 时忽略。
-func WithLogger(logger *slog.Logger) Option {
-	return func(e *LabelPropagationEngine) {
-		if logger != nil {
-			e.log = logger
-		}
-	}
-}
-
 // NewLabelPropagationEngine 创建标签传播聚类引擎。
 //
-// 依赖通过 With 选项注入；提示词默认使用模块内置实现（NewBuiltinPrompter），
-// 可用 WithPrompter 覆盖。core/memory 不再依赖 internal/config、internal/repository、observability。
-func NewLabelPropagationEngine(opts ...Option) *LabelPropagationEngine {
-	e := &LabelPropagationEngine{
-		prompt: memory.NewBuiltinPrompter(),
-		log:    slog.Default(),
+// 依赖通过 core/memory 的共享 With 选项注入（memory.WithLLM/WithCommunityStore/...）；
+// 提示词默认使用模块内置实现，可用 memory.WithPrompter 覆盖。
+func NewLabelPropagationEngine(opts ...memory.Option) *LabelPropagationEngine {
+	deps := memory.ResolveDeps(opts...)
+	return &LabelPropagationEngine{
+		cfg:           deps.Config,
+		id:            deps.IDGen,
+		llm:           deps.LLM,
+		prompt:        deps.Prompter,
+		jsonParser:    deps.JSONParser,
+		communityRepo: deps.Community,
+		memoryRepo:    deps.Graph,
+		log:           deps.Logger,
 	}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(e)
-		}
-	}
-	return e
 }
 
 // Invoke 无社区 → 全量
