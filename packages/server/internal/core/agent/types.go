@@ -38,7 +38,21 @@ const (
 	StopMaxIterations StopReason = "max_iterations"
 	// StopError 表示 Agent 因错误停止。
 	StopError StopReason = "error"
+	// StopBudgetExceeded 表示触达 token/成本/工具调用预算上限。
+	StopBudgetExceeded StopReason = "budget_exceeded"
+	// StopDeadlineExceeded 表示触达墙钟时间上限。
+	StopDeadlineExceeded StopReason = "deadline_exceeded"
+	// StopToolDenied 表示命中未授权工具且策略为硬停。
+	StopToolDenied StopReason = "tool_denied"
 )
+
+// StopReasonError 允许错误自带专属停止原因。
+//
+// 主循环收尾时会用 errors.As 探测该接口，使 harness 等外层扩展能在不修改核心停止原因
+// 常量映射的前提下，产出预算/门禁等专属 StopReason 而非笼统 StopError。
+type StopReasonError interface {
+	AgentStopReason() StopReason
+}
 
 // Phase 表示 Agent 内部状态机阶段。
 type Phase string

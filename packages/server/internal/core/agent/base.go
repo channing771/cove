@@ -198,6 +198,10 @@ func (b *Base[D, S]) CloneResult(result Result[S]) Result[S] {
 }
 
 func stopReasonForError(err error) StopReason {
+	var sre StopReasonError
+	if errors.As(err, &sre) {
+		return sre.AgentStopReason()
+	}
 	if errors.Is(err, ErrMaxIterations) {
 		return StopMaxIterations
 	}

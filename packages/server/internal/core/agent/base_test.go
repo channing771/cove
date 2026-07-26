@@ -3,12 +3,37 @@ package agent
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/boxify/api-go/internal/core/llm"
 	coretool "github.com/boxify/api-go/internal/core/tool"
 )
+
+type stopReasonErr struct{ reason StopReason }
+
+func (e stopReasonErr) Error() string               { return "stop: " + string(e.reason) }
+func (e stopReasonErr) AgentStopReason() StopReason { return e.reason }
+
+func TestStopReasonForError_CustomInterface(t *testing.T) {
+	err := fmt.Errorf("wrap: %w", stopReasonErr{reason: StopBudgetExceeded})
+	if got := stopReasonForError(err); got != StopBudgetExceeded {
+		t.Fatalf("got %q, want %q", got, StopBudgetExceeded)
+	}
+}
+
+func TestStopReasonForError_FallbackMaxIterations(t *testing.T) {
+	if got := stopReasonForError(ErrMaxIterations); got != StopMaxIterations {
+		t.Fatalf("got %q, want %q", got, StopMaxIterations)
+	}
+}
+
+func TestStopReasonForError_DefaultError(t *testing.T) {
+	if got := stopReasonForError(errors.New("boom")); got != StopError {
+		t.Fatalf("got %q, want %q", got, StopError)
+	}
+}
 
 type testDecision struct {
 	Input coretool.Input
