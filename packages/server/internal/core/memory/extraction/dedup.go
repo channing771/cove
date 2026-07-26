@@ -92,7 +92,7 @@ func (o *MemoryOrchestrator) dedupWithinBatch(ctx context.Context, entities []*m
 			txt := util.TextSim(left.Name, right.Name)
 			emb := util.Cosine(left.NameEmbedding, right.NameEmbedding)
 			con := util.Contains(left.Name, right.Name)
-			if max(txt, emb) < o.c.Memory.NameSimGate && !con {
+			if max(txt, emb) < o.cfg.NameSimGate && !con {
 				continue
 			}
 
@@ -101,7 +101,7 @@ func (o *MemoryOrchestrator) dedupWithinBatch(ctx context.Context, entities []*m
 				return nil, nil, err
 			}
 
-			if decision.SameEntity && decision.Confidence >= o.c.Memory.LLMMergeConfidence {
+			if decision.SameEntity && decision.Confidence >= o.cfg.LLMMergeConfidence {
 				if decision.CanonicalIdx == 1 {
 					o.mergeInto(right, left)
 					redirect[left.ID] = right.ID
@@ -172,7 +172,7 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 			emb := util.Cosine(entity.NameEmbedding, existEntity.NameEmbedding)
 			con := util.Contains(entity.Name, existEntity.Name)
 			score := max(txt, emb)
-			if (score >= o.c.Memory.NameSimGate || con) && score > bestScore {
+			if (score >= o.cfg.NameSimGate || con) && score > bestScore {
 				bestEntity, bestScore = existEntity, score
 				bestTxt, bestEmb = txt, emb
 			}
@@ -192,7 +192,7 @@ func (o *MemoryOrchestrator) mergeWithGraph(ctx context.Context, entities []*mem
 			return nil, nil, err
 		}
 
-		if decision.SameEntity && decision.Confidence >= o.c.Memory.LLMMergeConfidence {
+		if decision.SameEntity && decision.Confidence >= o.cfg.LLMMergeConfidence {
 			o.mergeInto(bestEntity, entity)
 			bestEntity.NameEmbedding = entity.NameEmbedding
 			redirect[entity.ID] = bestEntity.ID

@@ -11,13 +11,10 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/boxify/api-go/internal/config"
 	"github.com/boxify/api-go/internal/core/id"
 	"github.com/boxify/api-go/internal/core/jsonx"
 	"github.com/boxify/api-go/internal/core/llm"
 	"github.com/boxify/api-go/internal/core/memory"
-	"github.com/boxify/api-go/internal/observability/xlog"
-	"github.com/boxify/api-go/internal/repository"
 	"github.com/boxify/api-go/internal/util"
 	"github.com/boxify/api-go/internal/xerr"
 )
@@ -34,27 +31,34 @@ import (
 // LabelPropagationEngine 标签传播聚类引擎
 type LabelPropagationEngine struct {
 	log           *slog.Logger
-	c             *config.Config
+	cfg           memory.Config
 	id            id.Generator
 	llm           llm.Client
 	prompt        memory.Prompter
 	jsonParser    jsonx.Parser
-	communityRepo repository.MemoryCommunityRepository
-	memoryRepo    repository.MemoryGraphRepository
+	communityRepo memory.CommunityStore
+	memoryRepo    memory.GraphStore
 }
 
-func NewLabelPropagationEngine(config *config.Config, idGenerator id.Generator, llm llm.Client, prompt memory.Prompter,
-	jsonParser jsonx.Parser, memoryCommunityRepo repository.MemoryCommunityRepository,
-	memoryGraphRepo repository.MemoryGraphRepository) *LabelPropagationEngine {
+// NewLabelPropagationEngine 创建标签传播聚类引擎。
+//
+// cfg 为 memory 调参项，community/graph 为存储端口，logger 由调用方注入（nil 时用默认）。
+// 依赖全部通过参数注入，core/memory 不再依赖 internal/config、internal/repository、observability。
+func NewLabelPropagationEngine(cfg memory.Config, idGenerator id.Generator, llm llm.Client, prompt memory.Prompter,
+	jsonParser jsonx.Parser, community memory.CommunityStore,
+	graph memory.GraphStore, logger *slog.Logger) *LabelPropagationEngine {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &LabelPropagationEngine{
-		log:           xlog.Component("community_label_propagation"),
-		c:             config,
+		log:           logger,
+		cfg:           cfg,
 		id:            idGenerator,
 		llm:           llm,
 		prompt:        prompt,
 		jsonParser:    jsonParser,
-		communityRepo: memoryCommunityRepo,
-		memoryRepo:    memoryGraphRepo,
+		communityRepo: community,
+		memoryRepo:    graph,
 	}
 }
 
@@ -102,7 +106,7 @@ func (e *LabelPropagationEngine) fullClustering(ctx context.Context, userId stri
 		return err
 	}
 
-	for _ = range e.c.Memory.CommunityClusteringMaxIterations {
+	for _ = range e.cfg.CommunityClusteringMaxIterations {
 		changed := 0
 		for _, eid := range entityIds {
 			neighbors := neighborsCache[eid]
@@ -181,7 +185,7 @@ func (e *LabelPropagationEngine) weightVote(neighbors []*memory.EntityNeighborFo
 		}
 
 		sem := util.Cosine(embedding, nb.NameEmbedding)
-		weight := e.c.Memory.CommunityVoteSemWeight*sem + e.c.Memory.CommunityVoteRelWeight*1.0 // 关系边即记一次连接强度
+		weight := e.cfg.CommunityVoteSemWeight*sem + e.cfg.CommunityVoteRelWeight*1.0 // 关系边即记一次连接强度
 		votes[communityId] += weight
 	}
 
@@ -279,7 +283,7 @@ func (e *LabelPropagationEngine) mergeCommunities(ctx context.Context, userId st
 			}
 
 			// 是否到达可合并的阈值
-			if util.Cosine(avgEmbedding[r1], avgEmbedding[r2]) <= e.c.Memory.CommunityMergeThreshold {
+			if util.Cosine(avgEmbedding[r1], avgEmbedding[r2]) <= e.cfg.CommunityMergeThreshold {
 				continue
 			}
 

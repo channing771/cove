@@ -11,20 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/boxify/api-go/internal/config"
 	"github.com/boxify/api-go/internal/core/id"
 	"github.com/boxify/api-go/internal/core/jsonx"
 	"github.com/boxify/api-go/internal/core/llm"
 	"github.com/boxify/api-go/internal/core/memory"
 	"github.com/boxify/api-go/internal/core/memory/preprocessing"
-	"github.com/boxify/api-go/internal/observability/xlog"
-	"github.com/boxify/api-go/internal/repository"
 	"github.com/boxify/api-go/internal/xerr"
 )
 
 type MemoryOrchestrator struct {
 	log                *slog.Logger
-	c                  *config.Config
+	cfg                memory.Config
 	userId             string
 	id                 id.Generator
 	llm                llm.Client
@@ -33,14 +30,21 @@ type MemoryOrchestrator struct {
 	chunker            *preprocessing.TextChunker
 	statementExtractor *preprocessing.StatementExtractor
 	tripletExtractor   *TripletExtractor
-	memoryRepo         repository.MemoryGraphRepository
+	memoryRepo         memory.GraphStore
 }
 
-func NewMemoryOrchestrator(config *config.Config, userId string, idGenerator id.Generator, llm llm.Client, prompt memory.Prompter,
-	jsonParser jsonx.Parser, memoryGraphRepository repository.MemoryGraphRepository) *MemoryOrchestrator {
+// NewMemoryOrchestrator 创建记忆萃取编排器。
+//
+// cfg 为 memory 调参项，graph 为图存储端口，logger 为调用方注入的日志器（nil 时用默认）。
+// 依赖全部通过参数注入，core/memory 不再依赖 internal/config、internal/repository、observability。
+func NewMemoryOrchestrator(cfg memory.Config, userId string, idGenerator id.Generator, llm llm.Client, prompt memory.Prompter,
+	jsonParser jsonx.Parser, graph memory.GraphStore, logger *slog.Logger) *MemoryOrchestrator {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &MemoryOrchestrator{
-		log:                xlog.Component("memory_extract_orchestractor"),
-		c:                  config,
+		log:                logger,
+		cfg:                cfg,
 		userId:             userId,
 		id:                 idGenerator,
 		llm:                llm,
@@ -49,7 +53,7 @@ func NewMemoryOrchestrator(config *config.Config, userId string, idGenerator id.
 		chunker:            preprocessing.NewTextChunker(),
 		statementExtractor: preprocessing.NewStatementExtractor(llm, prompt, jsonParser),
 		tripletExtractor:   NewTripletExtractor(llm, prompt, jsonParser),
-		memoryRepo:         memoryGraphRepository,
+		memoryRepo:         graph,
 	}
 }
 
@@ -240,7 +244,7 @@ func (o *MemoryOrchestrator) RunExtraction(ctx context.Context, text string, sou
 		embeddingTexts = append(embeddingTexts, entity.Name)
 	}
 
-	vectors, err := o.llm.Embed(ctx, embeddingTexts, o.c.Rag.EmbeddingDim)
+	vectors, err := o.llm.Embed(ctx, embeddingTexts, o.cfg.EmbeddingDim)
 	if err != nil {
 		return nil, xerr.Wrapf(err, "embed text failed: %v", err)
 	}
