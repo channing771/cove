@@ -92,8 +92,7 @@ func (h *ParseImageTask) Handle(ctx context.Context, task *types.Task) error {
 
 	desc, err := h.describeImage(ctx, img, content)
 	if err != nil {
-		_ = h.markParseFailed(ctx, img, err)
-		return nil
+		return h.markParseFailed(ctx, img, err)
 	}
 	descText := strings.TrimSpace(desc.Description)
 	ocrText := strings.TrimSpace(desc.OCRText)
@@ -128,8 +127,7 @@ func (h *ParseImageTask) Handle(ctx context.Context, task *types.Task) error {
 	searchable := imageSearchableText(descText, ocrText, sceneText)
 	if searchable != "" {
 		if err := h.indexImageDescription(ctx, img, searchable); err != nil {
-			_ = h.markParseFailed(ctx, img, err)
-			return nil
+			return h.markParseFailed(ctx, img, err)
 		}
 	} else {
 		h.log.WarnContext(ctx, "图片描述为空，跳过向量索引",

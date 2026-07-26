@@ -56,7 +56,7 @@ DELETE other
 
 const refreshCommunityMemberCountCypher = `
 UNWIND $community_ids AS community_id
-MATCH (c:Community {usr_id: $user_id, id: community_id})
+MATCH (c:Community {user_id: $user_id, id: community_id})
 OPTIONAL MATCH (e:Entity {user_id: $user_id, community_id: community_id})
 WITH c, count(e) AS cnt
 SET c.member_count = cnt
@@ -65,16 +65,16 @@ RETURN cnt
 
 const getCommunityMembersCypher = `
 UNWIND $community_ids AS community_id
-MATCH (e:Entity {user_id: $user_id, community_id: community_id})
-WITH community_id, collect({
+OPTIONAL MATCH (e:Entity {user_id: $user_id, community_id: community_id})
+WITH community_id, collect(CASE WHEN e IS NULL THEN NULL ELSE {
 	 id: e.id,
 	 name: e.name,
 	 type: e.type,
 	 description: e.description,
 	 aliases: e.aliases,
 	 name_embedding: e.name_embedding
-}) AS members
-RETURN members
+} END) AS members
+RETURN community_id, members
 `
 
 const pruneEmptyCommunityCypher = `

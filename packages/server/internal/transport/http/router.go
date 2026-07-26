@@ -26,7 +26,7 @@ type Dependencies struct {
 }
 
 func NewRouter(deps Dependencies) *gin.Engine {
-	gin.SetMode(gin.TestMode)
+	gin.SetMode(gin.ReleaseMode)
 	response.RegisterValidatorTagNames()
 
 	r := gin.New()

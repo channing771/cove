@@ -138,7 +138,7 @@ func newTestRouterWithConfigAndOverrides(t *testing.T, cfg config.Config, config
 		PromptClient:      promptsgen.NewClient(promptManager),
 		MCPToolService:    coremcp.NewService(coremcp.WithClient(&testMCPToolClient{})),
 		SecretCipher:      cipher,
-		TokenIssuer:       security.NewTokenIssuer("test-secret", time.Hour),
+		TokenIssuer:       security.NewTokenIssuer("test-secret", time.Hour, security.WithDevToken()),
 	}
 	if configure != nil {
 		configure(svcCtx)

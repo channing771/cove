@@ -82,13 +82,11 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 
 	if h.svcCtx.RAGDocumentParser == nil || h.svcCtx.RAGChunker == nil {
 		err := xerr.Internal("文档解析任务依赖未初始化", nil)
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	parsed, err := h.svcCtx.RAGDocumentParser.Parse(ctx, ragparser.Input{Data: content, FileExt: doc.FileExt})
 	if err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档内容解析完成",
 		slog.String("user_id", doc.UserID.String()),
@@ -103,8 +101,7 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 	chunks := h.svcCtx.RAGChunker.Chunk(parsed.Text)
 	if len(chunks) == 0 {
 		err := errors.New("解析结果为空")
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档分块完成",
 		slog.String("user_id", doc.UserID.String()),
@@ -118,19 +115,16 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 	}
 	if h.svcCtx.RAGChunkRepo == nil || h.svcCtx.LLMManager == nil || h.svcCtx.TagRepo == nil {
 		err := xerr.Internal("文档解析任务依赖未初始化", nil)
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	texts := documentChunkTexts(chunks)
 	llmClient, err := h.embeddingClient(ctx, doc.UserID)
 	if err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	vectors, err := llmClient.Embed(ctx, texts, h.svcCtx.Config.Rag.EmbeddingDim, corellm.WithEmbeddingBatchSize(h.svcCtx.Config.Rag.EmbeddingBatchSize))
 	if err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档向量化完成",
 		slog.String("user_id", doc.UserID.String()),
@@ -139,20 +133,17 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 		slog.Int("embedding_dim", vectorDimension(vectors)),
 	)
 	if err := h.svcCtx.RAGChunkRepo.EnsureIndex(ctx, h.svcCtx.Config.Rag.EmbeddingDim); err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档 chunk 索引已确认",
 		slog.String("user_id", doc.UserID.String()),
 		slog.String("document_id", doc.ID.String()),
 	)
 	if err := h.svcCtx.RAGChunkRepo.DeleteBySource(ctx, doc.UserID, doc.ID); err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	if err := h.svcCtx.RAGChunkRepo.IndexDocumentChunks(ctx, doc, chunks, vectors); err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档 chunk 写入完成",
 		slog.String("user_id", doc.UserID.String()),
@@ -167,8 +158,7 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 	)
 	syncedTags, err := h.svcCtx.TagRepo.SyncDocumentTags(ctx, doc.UserID, doc.ID, tags)
 	if err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	doc.Tags = syncedTags
 	h.log.InfoContext(ctx, "文档标签已同步到数据库",
@@ -177,8 +167,7 @@ func (h *ParseDocumentTask) Handle(ctx context.Context, task *types.Task) error 
 		slog.Int("tag_count", len(tags)),
 	)
 	if err := h.svcCtx.RAGChunkRepo.UpdateTags(ctx, doc.UserID, doc.ID, tags); err != nil {
-		_ = h.markParseFailed(ctx, doc, err)
-		return nil
+		return h.markParseFailed(ctx, doc, err)
 	}
 	h.log.InfoContext(ctx, "文档标签已同步到 Elasticsearch",
 		slog.String("user_id", doc.UserID.String()),

@@ -96,8 +96,9 @@ func HashRefreshToken(token string) string {
 }
 
 type TokenIssuer struct {
-	secret []byte
-	ttl    time.Duration
+	secret        []byte
+	ttl           time.Duration
+	allowDevToken bool
 }
 
 type Claims struct {
@@ -109,8 +110,24 @@ type jwtClaims struct {
 	jwt.RegisteredClaims
 }
 
-func NewTokenIssuer(secret string, ttl time.Duration) *TokenIssuer {
-	return &TokenIssuer{secret: []byte(secret), ttl: ttl}
+// TokenIssuerOption 配置 TokenIssuer 的可选行为。
+type TokenIssuerOption func(*TokenIssuer)
+
+// WithDevToken 开启 "dev-token" 万能令牌，仅用于本地开发与测试。
+//
+// 默认关闭：生产装配不传该选项，因此 "dev-token" 不会绕过 JWT 校验。
+func WithDevToken() TokenIssuerOption {
+	return func(i *TokenIssuer) { i.allowDevToken = true }
+}
+
+func NewTokenIssuer(secret string, ttl time.Duration, opts ...TokenIssuerOption) *TokenIssuer {
+	issuer := &TokenIssuer{secret: []byte(secret), ttl: ttl}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(issuer)
+		}
+	}
+	return issuer
 }
 
 func (i *TokenIssuer) IssueAccessToken(userID uuid.UUID) (string, error) {
@@ -148,7 +165,8 @@ func (i *TokenIssuer) Parse(tokenValue string) (Claims, error) {
 }
 
 func (i *TokenIssuer) VerifyAccessToken(ctx context.Context, token string) (uuid.UUID, error) {
-	if token == "dev-token" {
+	// dev-token 是仅用于本地开发/测试的万能令牌，默认关闭，避免成为生产后门。
+	if i.allowDevToken && token == "dev-token" {
 		return uuid.MustParse("00000000-0000-0000-0000-000000000001"), nil
 	}
 	claims, err := i.Parse(token)

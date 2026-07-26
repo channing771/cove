@@ -266,10 +266,11 @@ func (l *ChatStreamLogic) ensureConversation(userID uuid.UUID, conversationIDStr
 	var title string
 	if message == "" {
 		title = "新对话"
-	} else if len(message) <= 20 {
+	} else if runes := []rune(message); len(runes) <= 20 {
 		title = message
 	} else {
-		title = message[:20]
+		// 按 rune 截断，避免把中文等多字节字符切成半个导致标题出现乱码。
+		title = string(runes[:20])
 	}
 
 	return l.svcCtx.ConversationRepo.Create(l.ctx, userID, &models.Conversation{Title: title})

@@ -53,7 +53,7 @@ SET n.user_id = row.user_id,
 	n.sequence = row.sequence,
 	n.created_at = row.created_at
 WITH n, row
-MATCH (d:Dialogue {id: row.dialogue_id})
+MATCH (d:Dialogue {id: row.dialog_id})
 MERGE (d)-[:HAS_CHUNK]->(n)
 RETURN count(n) AS cnt
 `
@@ -103,11 +103,11 @@ SET n.user_id = row.user_id,
 		ELSE CASE WHEN row.importance > n.importance THEN row.importance ELSE n.importance END
 	END,
 	n.confidence = row.confidence,
-	n.memory_layer = coalesce(n.memory_layer, row.memory_layer)
+	n.memory_layer = coalesce(n.memory_layer, row.memory_layer),
 	n.access_count = coalesce(n.access_count, row.access_count),
 	n.mention_count = coalesce(n.mention_count, row.mention_count),
 	n.connect_strength = CASE
-		WHEN n.connect_strength IS NULL OR n.content_strength = '' THEN row.connect_strength
+		WHEN n.connect_strength IS NULL OR n.connect_strength = '' THEN row.connect_strength
 		WHEN n.connect_strength = row.connect_strength THEN n.connect_strength
 		ELSE 'both'
 	END,

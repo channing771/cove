@@ -58,10 +58,7 @@ func (l *CreateAgentPersonaLogic) CreateAgentPersona(userID uuid.UUID, input *re
 		return nil, err
 	}
 
-	avatarUrl := ""
-	if persona.AvatarKey != "" {
-		avatarUrl = l.svcCtx.URLSigner.URL(persona.AvatarKey)
-	}
+	avatarUrl := avatarURL(l.svcCtx, persona.AvatarKey)
 
 	return mapper.AgentPersonaToResponse(persona, avatarUrl), nil
 }

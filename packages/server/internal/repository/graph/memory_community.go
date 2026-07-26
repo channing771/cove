@@ -137,7 +137,25 @@ func (m *MemoryCommunityRepository) GetCommunityMembers(ctx context.Context, use
 	if err != nil {
 		return nil, xerr.Wrapf(err, "获取社区成员失败")
 	}
-	return dbneo4j.DecodeMany[[]*memory.CommunityMember](rows, "members")
+	// 按 community_id 建索引，再按调用方给定顺序装配。
+	// OPTIONAL MATCH 保证每个社区都有一行，空社区成员列表为空，避免行数与入参错位。
+	byID := make(map[string][]*memory.CommunityMember, len(rows))
+	for _, row := range rows {
+		communityID, err := dbneo4j.DecodeRow[string](row, "community_id")
+		if err != nil {
+			return nil, xerr.Wrapf(err, "解析社区成员 community_id 失败")
+		}
+		members, err := dbneo4j.DecodeRow[[]*memory.CommunityMember](row, "members")
+		if err != nil {
+			return nil, xerr.Wrapf(err, "解析社区成员失败")
+		}
+		byID[communityID] = members
+	}
+	out := make([][]*memory.CommunityMember, len(communityIds))
+	for i, communityID := range communityIds {
+		out[i] = byID[communityID]
+	}
+	return out, nil
 }
 
 // PruneEmptyCommunity 清理没有成员的社区节点

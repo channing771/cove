@@ -63,10 +63,7 @@ func (l *ListAgentPersonasLogic) ListAgentPersonas(userID uuid.UUID, input *requ
 
 	resList := make([]*response.AgentPersonaResponse, 0, len(filterPersonas))
 	for _, persona := range filterPersonas {
-		avatarUrl := ""
-		if persona.AvatarKey != "" {
-			avatarUrl = l.svcCtx.URLSigner.URL(persona.AvatarKey)
-		}
+		avatarUrl := avatarURL(l.svcCtx, persona.AvatarKey)
 		resList = append(resList, mapper.AgentPersonaToResponse(persona, avatarUrl))
 	}
 
