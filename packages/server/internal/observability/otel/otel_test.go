@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/boxify/api-go/internal/config"
+	"github.com/boxify/api-go/internal/core/agent/harness"
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -17,8 +18,8 @@ func TestTracerAdapter_RecordsSpanWithAttrAndStatus(t *testing.T) {
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
 	tracer := NewTracer(tp.Tracer("test"))
 
-	_, span := tracer.StartSpan(context.Background(), SpanExecuteTool)
-	span.SetAttr(AttrToolName, "search")
+	_, span := tracer.StartSpan(context.Background(), harness.SpanExecuteTool)
+	span.SetAttr(harness.AttrToolName, "search")
 	span.End(errors.New("boom"))
 
 	spans := rec.Ended()
@@ -26,7 +27,7 @@ func TestTracerAdapter_RecordsSpanWithAttrAndStatus(t *testing.T) {
 		t.Fatalf("应记录 1 个 span, got %d", len(spans))
 	}
 	s := spans[0]
-	if s.Name() != SpanExecuteTool {
+	if s.Name() != harness.SpanExecuteTool {
 		t.Fatalf("span 名错误: %q", s.Name())
 	}
 	if s.Status().Code != codes.Error {
@@ -34,7 +35,7 @@ func TestTracerAdapter_RecordsSpanWithAttrAndStatus(t *testing.T) {
 	}
 	var found bool
 	for _, kv := range s.Attributes() {
-		if string(kv.Key) == AttrToolName && kv.Value.AsString() == "search" {
+		if string(kv.Key) == harness.AttrToolName && kv.Value.AsString() == "search" {
 			found = true
 		}
 	}

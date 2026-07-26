@@ -11,9 +11,10 @@ import (
 	coretool "github.com/boxify/api-go/internal/core/tool"
 )
 
-// newObservabilityHooks 构造可观测 hooks，发射 metrics/trace 并打结构化日志。
+// newObservabilityHooks 构造可观测 hooks，发射 metrics、起 trace span 并打结构化日志。
 //
-// 每次 Run 应新建一份实例：内部用起始时间戳 map 计算时延，跨 Run 复用会串扰。
+// 每次 Run 应新建一份实例：内部用起始时间戳与活跃 span map 维护状态，跨 Run 复用会串扰。
+// span 父子经存储的 runCtx 手工串联（hooks 无法把派生 ctx 回注主循环）。
 func newObservabilityHooks(m Metrics, tr Tracer) corereact.Hooks {
 	if m == nil {
 		m = NoopMetrics{}
@@ -21,7 +22,12 @@ func newObservabilityHooks(m Metrics, tr Tracer) corereact.Hooks {
 	if tr == nil {
 		tr = NoopTracer{}
 	}
-	return &observabilityHooks{metrics: m, tracer: tr, starts: map[string]time.Time{}}
+	return &observabilityHooks{
+		metrics: m,
+		tracer:  tr,
+		starts:  map[string]time.Time{},
+		spans:   map[string]Span{},
+	}
 }
 
 type observabilityHooks struct {
@@ -30,6 +36,9 @@ type observabilityHooks struct {
 	tracer  Tracer
 	mu      sync.Mutex
 	starts  map[string]time.Time
+	spans   map[string]Span
+	runCtx  context.Context
+	runSpan Span
 }
 
 func (h *observabilityHooks) mark(key string) {
@@ -48,14 +57,57 @@ func (h *observabilityHooks) since(key string) float64 {
 	return time.Since(t).Seconds()
 }
 
-func (h *observabilityHooks) BeforeRun(_ context.Context, _ corereact.State) error {
+// parentCtx 返回 run span 的 ctx 作为子 span 的父；无 run span 时回退传入 ctx。
+func (h *observabilityHooks) parentCtx(ctx context.Context) context.Context {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.runCtx != nil {
+		return h.runCtx
+	}
+	return ctx
+}
+
+func (h *observabilityHooks) startSpan(key string, ctx context.Context, name string) Span {
+	_, span := h.tracer.StartSpan(h.parentCtx(ctx), name)
+	h.mu.Lock()
+	h.spans[key] = span
+	h.mu.Unlock()
+	return span
+}
+
+func (h *observabilityHooks) endSpan(key string, err error) {
+	h.mu.Lock()
+	span := h.spans[key]
+	delete(h.spans, key)
+	h.mu.Unlock()
+	if span != nil {
+		span.End(err)
+	}
+}
+
+func (h *observabilityHooks) BeforeRun(ctx context.Context, _ corereact.State) error {
 	h.mark("run")
+	runCtx, span := h.tracer.StartSpan(ctx, SpanAgentRun)
+	span.SetAttr(AttrAgentName, agentName)
+	h.mu.Lock()
+	h.runCtx = runCtx
+	h.runSpan = span
+	h.mu.Unlock()
 	return nil
 }
 
 func (h *observabilityHooks) AfterRun(ctx context.Context, result corereact.Result, runErr error) error {
 	h.metrics.IncrCounter("agent_runs_total", map[string]string{"stopped_by": string(result.StoppedBy)})
 	h.metrics.ObserveHistogram("agent_run_duration_seconds", h.since("run"), nil)
+	h.mu.Lock()
+	span := h.runSpan
+	h.runSpan = nil
+	h.mu.Unlock()
+	if span != nil {
+		span.SetAttr(AttrStopReason, string(result.StoppedBy))
+		span.SetAttr(AttrIterations, result.Iterations)
+		span.End(runErr)
+	}
 	slog.InfoContext(ctx, "agent run finished",
 		"stopped_by", string(result.StoppedBy),
 		"iterations", result.Iterations,
@@ -64,8 +116,9 @@ func (h *observabilityHooks) AfterRun(ctx context.Context, result corereact.Resu
 	return nil
 }
 
-func (h *observabilityHooks) BeforeModel(_ context.Context, _ corereact.State, _ []*llm.Message) error {
+func (h *observabilityHooks) BeforeModel(ctx context.Context, _ corereact.State, _ []*llm.Message) error {
 	h.mark("model")
+	h.startSpan("model", ctx, SpanChat)
 	return nil
 }
 
@@ -76,11 +129,14 @@ func (h *observabilityHooks) AfterModel(_ context.Context, _ corereact.State, _ 
 	}
 	h.metrics.IncrCounter("agent_model_calls_total", map[string]string{"status": status})
 	h.metrics.ObserveHistogram("agent_model_latency_seconds", h.since("model"), nil)
+	h.endSpan("model", modelErr)
 	return nil
 }
 
-func (h *observabilityHooks) BeforeTool(_ context.Context, _ corereact.State, call corereact.ToolCall) error {
+func (h *observabilityHooks) BeforeTool(ctx context.Context, _ corereact.State, call corereact.ToolCall) error {
 	h.mark("tool:" + call.Name)
+	span := h.startSpan("tool:"+call.Name, ctx, SpanExecuteTool)
+	span.SetAttr(AttrToolName, call.Name)
 	return nil
 }
 
@@ -91,6 +147,7 @@ func (h *observabilityHooks) AfterTool(_ context.Context, _ corereact.State, cal
 	}
 	h.metrics.IncrCounter("agent_tool_calls_total", map[string]string{"tool": call.Name, "status": status})
 	h.metrics.ObserveHistogram("agent_tool_latency_seconds", h.since("tool:"+call.Name), map[string]string{"tool": call.Name})
+	h.endSpan("tool:"+call.Name, toolErr)
 	return nil
 }
 
