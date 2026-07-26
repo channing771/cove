@@ -20,10 +20,7 @@ func TestRegisterMakesFlatTemplatesAvailableByLogicalName(t *testing.T) {
 		marker string
 	}{
 		{name: "agent/optimize_prompt", marker: "RawPrompt"},
-		{name: "memory/statement_extract", marker: "Content"},
-		{name: "memory/triplet_extract", marker: "Statement"},
-		{name: "memory/dedup_entity", marker: "EntityA"},
-		{name: "memory/generate_community_metadata", marker: "Members"},
+		{name: "skill/optimize_prompt", marker: "RawPrompt"},
 	}
 	for _, tc := range cases {
 		text, err := manager.TemplateText(tc.name)

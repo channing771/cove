@@ -2,7 +2,8 @@ package memory
 
 // Prompter 定义记忆处理流程所需的提示词能力。
 //
-// 实现由 core 外部注入，因此记忆流程不依赖模板注册位置、模板名称或具体模板引擎。
+// 默认实现 NewBuiltinPrompter 使用 core/memory/prompt 内置模板；调用方可通过
+// WithPrompter 覆盖，因此记忆流程既自带提示词，又保留可替换性。
 type Prompter interface {
 	StatementExtract(input *StatementPromptInput) (string, error)
 	TripletExtract(input *TripletPromptInput) (string, error)

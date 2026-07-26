@@ -33,28 +33,72 @@ type MemoryOrchestrator struct {
 	memoryRepo         memory.GraphStore
 }
 
+// Option 配置 MemoryOrchestrator。
+type Option func(*MemoryOrchestrator)
+
+// WithConfig 设置 memory 调参项。
+func WithConfig(cfg memory.Config) Option {
+	return func(o *MemoryOrchestrator) { o.cfg = cfg }
+}
+
+// WithLLM 设置向量化与判定使用的模型客户端。
+func WithLLM(client llm.Client) Option {
+	return func(o *MemoryOrchestrator) { o.llm = client }
+}
+
+// WithGraphStore 设置图存储端口。
+func WithGraphStore(graph memory.GraphStore) Option {
+	return func(o *MemoryOrchestrator) { o.memoryRepo = graph }
+}
+
+// WithIDGenerator 设置 ID 生成器。
+func WithIDGenerator(generator id.Generator) Option {
+	return func(o *MemoryOrchestrator) { o.id = generator }
+}
+
+// WithJSONParser 设置 LLM 输出的 JSON 解析器。
+func WithJSONParser(parser jsonx.Parser) Option {
+	return func(o *MemoryOrchestrator) { o.jsonParser = parser }
+}
+
+// WithPrompter 覆盖默认内置提示词实现；传 nil 时忽略。
+func WithPrompter(prompter memory.Prompter) Option {
+	return func(o *MemoryOrchestrator) {
+		if prompter != nil {
+			o.prompt = prompter
+		}
+	}
+}
+
+// WithLogger 注入日志器；传 nil 时忽略。
+func WithLogger(logger *slog.Logger) Option {
+	return func(o *MemoryOrchestrator) {
+		if logger != nil {
+			o.log = logger
+		}
+	}
+}
+
 // NewMemoryOrchestrator 创建记忆萃取编排器。
 //
-// cfg 为 memory 调参项，graph 为图存储端口，logger 为调用方注入的日志器（nil 时用默认）。
-// 依赖全部通过参数注入，core/memory 不再依赖 internal/config、internal/repository、observability。
-func NewMemoryOrchestrator(cfg memory.Config, userId string, idGenerator id.Generator, llm llm.Client, prompt memory.Prompter,
-	jsonParser jsonx.Parser, graph memory.GraphStore, logger *slog.Logger) *MemoryOrchestrator {
-	if logger == nil {
-		logger = slog.Default()
+// 依赖通过 With 选项注入；提示词默认使用模块内置实现（NewBuiltinPrompter），
+// 可用 WithPrompter 覆盖。core/memory 不再依赖 internal/config、internal/repository、observability。
+func NewMemoryOrchestrator(userId string, opts ...Option) *MemoryOrchestrator {
+	o := &MemoryOrchestrator{
+		userId:  userId,
+		prompt:  memory.NewBuiltinPrompter(),
+		log:     slog.Default(),
+		chunker: preprocessing.NewTextChunker(),
 	}
-	return &MemoryOrchestrator{
-		log:                logger,
-		cfg:                cfg,
-		userId:             userId,
-		id:                 idGenerator,
-		llm:                llm,
-		prompt:             prompt,
-		jsonParser:         jsonParser,
-		chunker:            preprocessing.NewTextChunker(),
-		statementExtractor: preprocessing.NewStatementExtractor(llm, prompt, jsonParser),
-		tripletExtractor:   NewTripletExtractor(llm, prompt, jsonParser),
-		memoryRepo:         graph,
+	for _, opt := range opts {
+		if opt != nil {
+			opt(o)
+		}
 	}
+	// 子抽取器依赖选项注入后的 llm/prompt/jsonParser，需在应用选项之后构建。
+	o.statementExtractor = preprocessing.NewStatementExtractor(o.llm, o.prompt, o.jsonParser)
+	o.tripletExtractor = NewTripletExtractor(o.llm, o.prompt, o.jsonParser)
+	return o
 }
 
 // RunExtraction 对一段文本执行完整萃取并写入图谱

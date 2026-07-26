@@ -23,18 +23,15 @@ type definition struct {
 func registeredPrompts() []definition {
 	return []definition{
 		{name: "agent/optimize_prompt", file: "optimize_prompt.tmpl"},
-		{name: "memory/statement_extract", file: "extract_statement.tmpl"},
-		{name: "memory/triplet_extract", file: "extract_triplet.tmpl"},
-		{name: "memory/dedup_entity", file: "dedup_entity.tmpl"},
-		{name: "memory/generate_community_metadata", file: "generate_community_metadata.tmpl"},
 		{name: "skill/optimize_prompt", file: "optimize_skill_prompt.tmpl"},
 	}
 }
 
 // Register 将内置业务提示词注册到 manager。
 //
-// manager 不能为 nil。注册完成后，调用方可继续使用 agent/... 和 memory/... 逻辑名称
-// 读取或渲染模板。读取嵌入模板或注册模板失败时，Register 返回包含逻辑名称的错误。
+// manager 不能为 nil。注册完成后，调用方可继续使用 agent/... 和 skill/... 逻辑名称
+// 读取或渲染模板。记忆流程的提示词已内置在 core/memory/prompt，不再经此注册。
+// 读取嵌入模板或注册模板失败时，Register 返回包含逻辑名称的错误。
 func Register(manager *coreprompt.Manager) error {
 	if manager == nil {
 		return fmt.Errorf("prompt manager is nil")
