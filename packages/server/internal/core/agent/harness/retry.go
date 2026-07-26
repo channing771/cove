@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	coreagent "github.com/boxify/api-go/internal/core/agent"
 	"github.com/boxify/api-go/internal/core/llm"
 )
 
@@ -87,6 +88,11 @@ func DefaultRetryable(err error) bool {
 		return false
 	}
 	if errors.Is(err, ErrCircuitOpen) {
+		return false
+	}
+	// 治理类错误（预算/墙钟/门禁）是终止条件，重试无意义。
+	var sre coreagent.StopReasonError
+	if errors.As(err, &sre) {
 		return false
 	}
 	return true
