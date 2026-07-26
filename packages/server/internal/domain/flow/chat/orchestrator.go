@@ -190,7 +190,7 @@ func (o *Orchestrator) generate(ctx context.Context, input Input, events chan<- 
 	// 企业级 Harness 默认接管运行（可靠性/治理/可观测），config 关闭时回退到裸 react.Agent。
 	var engine chatEngine
 	if hc := o.svcCtx.Config.Agent.Harness; hc.Enabled {
-		engine = harness.New(client, registry, harnessOptions(hc, hooks, input.Temperature, input.SystemPrompt, contextManager)...)
+		engine = harness.New(client, registry, harnessOptions(hc, hooks, input.Temperature, input.SystemPrompt, contextManager, o.svcCtx.HarnessMetrics, o.svcCtx.HarnessTracer)...)
 	} else {
 		engine = corereact.New(client, registry, options...)
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/boxify/api-go/internal/config"
+	"github.com/boxify/api-go/internal/core/agent/harness"
 	corechannel "github.com/boxify/api-go/internal/core/channel"
 	corellm "github.com/boxify/api-go/internal/core/llm"
 	coremcp "github.com/boxify/api-go/internal/core/mcp"
@@ -88,6 +89,11 @@ type ServiceContext struct {
 	LLMManager      *corellm.Manager
 	MCPToolService  *coremcp.Service
 	ChannelRegistry *corechannel.Registry
+
+	// HarnessMetrics / HarnessTracer 为 Agent Harness 的可观测出口，默认 noop，
+	// 由进程入口（如 cmd/api）在装配 OTel 后覆盖。
+	HarnessMetrics harness.Metrics
+	HarnessTracer  harness.Tracer
 
 	closeOnce sync.Once
 	closeErr  error
@@ -218,7 +224,21 @@ func New(ctx context.Context, cfg config.Config) (*ServiceContext, error) {
 		svcCtx.MemoryGraphRepo = graph.NewMemoryGraphRepository(neo4jClient)
 	}
 
+	// 可观测出口默认 noop；进程入口装配 OTel 后通过 SetObservability 覆盖。
+	svcCtx.HarnessMetrics = harness.NoopMetrics{}
+	svcCtx.HarnessTracer = harness.NoopTracer{}
+
 	return svcCtx, nil
+}
+
+// SetObservability 覆盖 Agent Harness 的指标与追踪出口。nil 参数保持原值。
+func (s *ServiceContext) SetObservability(metrics harness.Metrics, tracer harness.Tracer) {
+	if metrics != nil {
+		s.HarnessMetrics = metrics
+	}
+	if tracer != nil {
+		s.HarnessTracer = tracer
+	}
 }
 
 func bindPostgresRepositories(s *ServiceContext, db *gorm.DB) {
@@ -299,6 +319,8 @@ func newTxContext(s *ServiceContext) ServiceContext {
 		LLMManager:                   s.LLMManager,
 		MCPToolService:               s.MCPToolService,
 		ChannelRegistry:              s.ChannelRegistry,
+		HarnessMetrics:               s.HarnessMetrics,
+		HarnessTracer:                s.HarnessTracer,
 		closeErr:                     s.closeErr,
 	}
 }

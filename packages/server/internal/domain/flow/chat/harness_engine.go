@@ -20,7 +20,7 @@ type chatEngine interface {
 // harnessOptions 把 HarnessConfig 与运行期参数映射为 harness 选项。
 //
 // contextManager 为 nil 时不注入 MessagePreparer（避免非空接口包裹空指针导致空调用）。
-func harnessOptions(hc config.HarnessConfig, hooks corereact.Hooks, temperature float64, systemPrompt string, contextManager *corecontext.Manager) []harness.Option {
+func harnessOptions(hc config.HarnessConfig, hooks corereact.Hooks, temperature float64, systemPrompt string, contextManager *corecontext.Manager, metrics harness.Metrics, tracer harness.Tracer) []harness.Option {
 	opts := []harness.Option{
 		harness.WithUserHooks(hooks),
 		harness.WithSystemPrompt(strings.TrimSpace(systemPrompt)),
@@ -30,6 +30,8 @@ func harnessOptions(hc config.HarnessConfig, hooks corereact.Hooks, temperature 
 		harness.WithBreaker(harness.BreakerConfig{FailureThreshold: hc.BreakerFailures, OpenDuration: msDuration(hc.BreakerOpenMs)}),
 		harness.WithBudgetConfig(harness.BudgetConfig{MaxTotalTokens: hc.MaxTotalTokens, MaxToolCalls: hc.MaxToolCalls}),
 		harness.WithWallClock(msDuration(hc.WallClockMs)),
+		harness.WithMetrics(metrics),
+		harness.WithTracer(tracer),
 	}
 	if contextManager != nil {
 		opts = append(opts, harness.WithMessagePreparer(contextManager))

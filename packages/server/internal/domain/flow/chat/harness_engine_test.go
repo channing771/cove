@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/boxify/api-go/internal/config"
+	"github.com/boxify/api-go/internal/core/agent/harness"
 )
 
 func TestMsDuration(t *testing.T) {
@@ -18,7 +19,7 @@ func TestMsDuration(t *testing.T) {
 
 func TestHarnessOptions_NonEmpty(t *testing.T) {
 	hc := config.HarnessConfig{Enabled: true, RetryMaxAttempts: 3, RetryBaseMs: 200, TimeoutMs: 1000, MaxToolCalls: 20}
-	opts := harnessOptions(hc, nil, 0.7, "you are cove", nil)
+	opts := harnessOptions(hc, nil, 0.7, "you are cove", nil, harness.NoopMetrics{}, harness.NoopTracer{})
 	if len(opts) == 0 {
 		t.Fatal("harnessOptions 不应为空")
 	}

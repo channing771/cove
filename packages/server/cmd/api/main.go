@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/boxify/api-go/internal/config"
+	otelobs "github.com/boxify/api-go/internal/observability/otel"
 	"github.com/boxify/api-go/internal/observability/xlog"
 	"github.com/boxify/api-go/internal/svc"
 	httptransport "github.com/boxify/api-go/internal/transport/http"
@@ -23,10 +24,29 @@ func main() {
 	})
 
 	ctx := context.Background()
+
+	// 装配 LLM 可观测（OTel/OTLP）。失败不阻断启动，退化为 noop。
+	providers, err := otelobs.Setup(ctx, cfg.Observability.OTel)
+	if err != nil {
+		slog.Warn("初始化 OTel 可观测失败，退化为无遥测", "错误", err)
+		providers = nil
+	}
+	defer func() {
+		if providers == nil {
+			return
+		}
+		if err := providers.Shutdown(ctx); err != nil {
+			slog.Error("关闭 OTel 可观测失败", "错误", err)
+		}
+	}()
+
 	svcCtx, err := svc.New(ctx, cfg)
 	if err != nil {
 		slog.Error("初始化服务上下文失败", "错误", err)
 		os.Exit(1)
+	}
+	if providers != nil {
+		svcCtx.SetObservability(providers.Metrics, providers.Tracer)
 	}
 
 	defer func() {
