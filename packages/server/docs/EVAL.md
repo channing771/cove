@@ -103,6 +103,38 @@ rep, _ := e.Run(ctx, ds)           // 产出的是同一个 eval.Report,可 Diff
 **生成层忠实度**(答案是否被检索上下文支撑/答案正确性)不在本包:RAG 经 `knowledge_search`
 工具交付,端到端质量由 agent 评测(agent + 该工具)承接。
 
+### 真实数据评测(-tags ragreal)
+
+不止 fake:`realdata_test.go` 把**仓库自身的 7 篇真实中文技术文档**灌入**真实 Qdrant +
+Elasticsearch**,经生产链路(`ragchunker` 分块 → `ragchunk.Repository` 双写 →
+`ragsearch.Searcher` 混合融合)跑自建数据集 `testdata/datasets/cove-docs.json`(12 条真实
+查询,golden 用可读文件名标注)。
+
+```bash
+docker compose -f deployments/docker-compose.evalstores.yml up -d
+# 首次生成基线
+EVAL_WRITE_BASELINE=1 go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
+# 之后即为回归门禁(对比 testdata/baselines/cove-docs.json)
+go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
+```
+
+实测基线(7 文档 / 75 chunk / top_k=5):recall\@5 **1.000**、hit\_rate **1.000**、
+MRR **1.000**、nDCG **0.9866**、precision\@5 **0.5972**,pass\_rate 100%。阈值取实测值的
+保守下界写进数据集,使门禁能抓回归又不抖动。
+
+**嵌入**:默认用 `corpus.HashEmbedder`(字符 bigram 特征哈希 + L2 归一化)—— 无需 API key、
+完全可复现,配合 ES 的真实 BM25 通道即可产出有意义的混合排序;要评测真实模型的语义检索,
+把真实 `llm.Client` 注入 `Ingester.Embedder` 与 `SearcherRetriever.Embedder` 即可替换。
+
+**两个真实数据才暴露的问题(已修)**:
+1. **nDCG 溢出 (0,1]**:doc 级匹配下同一文档有多个 chunk 命中,逐 chunk 计入会让 DCG 重复
+   累加同一篇文档,而 IDCG 以 golden 文档数封顶 → 实测出现 nDCG=2.04。现按身份去重后计算,
+   与 Recall/Precision 口径一致(回归测试见 `TestNDCGBoundedWithRepeatedDocChunks`)。
+2. **排序在多次运行间漂移**:ES 的 BM25 IDF 统计会把"已删除但未段合并"的文档计入,反复
+   delete+reindex 会让词项统计逐轮变化,导致同一查询的排名波动(实测某文档从 rank 1 掉到
+   rank 3)。现每次评测先删除并重建索引/collection(`resetStores`),连续 3 次运行指标指纹
+   完全一致。**在真实检索存储上做评测,务必从干净索引开始。**
+
 ## 二期:线上生产评估(暂缓,设计留档)
 
 复用同一 `eval.Scorer` 接口对真实运行(经 harness user-hook 捕获 `react.Result`)打分,

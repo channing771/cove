@@ -63,6 +63,29 @@ func TestSkipWithoutGolden(t *testing.T) {
 	}
 }
 
+// 真实语料下同一文档常有多个 chunk 命中;doc 级匹配必须按文档去重,
+// 否则 DCG 重复累加同一篇文档会让 nDCG 溢出 (0,1]。
+func TestNDCGBoundedWithRepeatedDocChunks(t *testing.T) {
+	rec := RetrievalRecord{Hits: []RetrievedHit{
+		{ChunkID: "a1", DocID: "dA", Content: "x"},
+		{ChunkID: "a2", DocID: "dA", Content: "y"},
+		{ChunkID: "a3", DocID: "dA", Content: "z"},
+		{ChunkID: "b1", DocID: "dB", Content: "w"},
+	}, RequestedK: 5}
+	c := eval.Case{Expect: map[string]any{"relevant_ids": []any{"dA"}}}
+	got := NDCG().Score(context.Background(), c, rec)
+	if got.Value > 1.0 || got.Value < 0 {
+		t.Fatalf("ndcg = %v, must be within [0,1]", got.Value)
+	}
+	if !near(got.Value, 1.0) {
+		t.Fatalf("ndcg = %v, want 1.0 (唯一 golden 文档排在首位)", got.Value)
+	}
+	// 同理 precision 以文档为单位:命中 {dA,dB} 中 1 个相关 → 0.5
+	if p := PrecisionAtK().Score(context.Background(), c, rec); !near(p.Value, 0.5) {
+		t.Fatalf("precision = %v, want 0.5", p.Value)
+	}
+}
+
 func TestMatchOnChunk(t *testing.T) {
 	rec := RetrievalRecord{Hits: docHits("d1", "d2"), RequestedK: 5}
 	// golden 用 chunk id;match_on=chunk

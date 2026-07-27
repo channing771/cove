@@ -15,12 +15,19 @@ type RetrievedHit struct {
 	RerankScore *float64 `json:"rerank_score,omitempty"`
 }
 
-// identity 按匹配维度返回该命中的身份:match_on=="chunk" 用 chunk id,否则用文档 id。
+// identity 按匹配维度返回该命中的身份。
+//
+// match_on 取值:"chunk" 用 chunk id;"name" 用文档名(便于数据集用可读文件名做 golden
+// 标注,而非 UUID);其余(默认 "doc")用文档来源 id。
 func (h RetrievedHit) identity(matchOn string) string {
-	if matchOn == "chunk" {
+	switch matchOn {
+	case "chunk":
 		return h.ChunkID
+	case "name":
+		return h.DocName
+	default:
+		return h.DocID
 	}
-	return h.DocID
 }
 
 // Retriever 是 RAG 检索的被测接口(SUT)。
@@ -62,12 +69,21 @@ func (r RetrievalRecord) identities(matchOn string, k int) []string {
 	return out
 }
 
-// relevanceFlags 返回前 k 条命中逐位是否命中 golden(用于 MRR / nDCG 的位置敏感计算)。
+// relevanceFlags 返回前 k 条命中按身份去重后、逐位是否命中 golden。
+//
+// 必须去重:doc 级匹配下同一文档常有多个 chunk 命中,若逐 chunk 计入,DCG 会把同一篇
+// 文档重复累加,而 IDCG 以 golden 文档数封顶,导致 nDCG 溢出 (0,1] 区间。去重后与
+// Recall/Precision 的口径一致(均以"检索到的不同文档"为单位)。
 func (r RetrievalRecord) relevanceFlags(golden map[string]bool, matchOn string, k int) []bool {
-	hits := r.topKHits(k)
-	flags := make([]bool, len(hits))
-	for i, h := range hits {
-		flags[i] = golden[h.identity(matchOn)]
+	seen := map[string]bool{}
+	var flags []bool
+	for _, h := range r.topKHits(k) {
+		id := h.identity(matchOn)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		flags = append(flags, golden[id])
 	}
 	return flags
 }

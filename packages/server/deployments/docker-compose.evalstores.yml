@@ -1,0 +1,33 @@
+# RAG 评测用的检索存储(真实 Qdrant + Elasticsearch),供 -tags ragreal 的真实数据评测使用。
+#
+#   docker compose -f deployments/docker-compose.evalstores.yml up -d
+#   go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
+#
+# 评测每次运行会先删除并重建 cove_eval_chunks 索引/collection(见 realdata_test.go 的
+# resetStores):ES 的 BM25 IDF 统计会把"已删除但未段合并"的文档计入,不清空会让词项
+# 统计逐轮漂移、排序不可复现。故本栈仅供评测,勿与开发数据混用。
+name: cove-evalstores
+
+services:
+  qdrant:
+    image: docker.io/qdrant/qdrant:latest
+    ports:
+      - "6333:6333" # REST(评测用它删除 collection)
+      - "6334:6334" # gRPC(DenseIndex 客户端)
+    volumes:
+      - eval_qdrant:/qdrant/storage
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - eval_es:/usr/share/elasticsearch/data
+
+volumes:
+  eval_qdrant:
+  eval_es:

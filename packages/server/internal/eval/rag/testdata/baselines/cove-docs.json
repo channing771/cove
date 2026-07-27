@@ -1,0 +1,582 @@
+{
+  "dataset": "cove-docs",
+  "cases": [
+    {
+      "case_id": "q-react-dual-path",
+      "tags": [
+        "agent"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-agent-phase",
+      "tags": [
+        "agent"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-harness-pillars",
+      "tags": [
+        "harness"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-harness-resilience",
+      "tags": [
+        "harness"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-langfuse-quickstart",
+      "tags": [
+        "observability"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.9197207891481877,
+          "passed": true,
+          "detail": "0.9197 (min 0.9000)"
+        }
+      ],
+      "latency_ms": 3,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-otel-config",
+      "tags": [
+        "observability"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-vectorstore-ports",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 5,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-hybrid-fusion",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-rag-metrics",
+      "tags": [
+        "eval"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-expect-keys",
+      "tags": [
+        "eval"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 3,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-eval-layers",
+      "tags": [
+        "eval"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-cassette",
+      "tags": [
+        "eval",
+        "harness"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 1.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.9197207891481877,
+          "passed": true,
+          "detail": "0.9197 (min 0.9000)"
+        }
+      ],
+      "latency_ms": 4,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    }
+  ],
+  "pass_rate": 1,
+  "scorers": {
+    "hit_rate": {
+      "scorer": "hit_rate",
+      "runs": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errored": 0,
+      "mean_value": 1
+    },
+    "mrr": {
+      "scorer": "mrr",
+      "runs": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errored": 0,
+      "mean_value": 1
+    },
+    "ndcg": {
+      "scorer": "ndcg",
+      "runs": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errored": 0,
+      "mean_value": 0.986620131524698
+    },
+    "precision_at_k": {
+      "scorer": "precision_at_k",
+      "runs": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errored": 0,
+      "mean_value": 0.5972222222222222
+    },
+    "recall_at_k": {
+      "scorer": "recall_at_k",
+      "runs": 12,
+      "passed": 12,
+      "failed": 0,
+      "skipped": 0,
+      "errored": 0,
+      "mean_value": 1
+    }
+  }
+}
