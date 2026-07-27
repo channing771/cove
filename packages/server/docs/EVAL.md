@@ -86,13 +86,13 @@ rep, _ := e.Run(ctx, ds)           // 产出的是同一个 eval.Report,可 Diff
 
 **接真实检索器**:`ragadapter.SearcherRetriever{Searcher: svcCtx.RAGSearcher, Embedder: embClient, Filter: fenceFilter}` 把生产 `ragsearch.Searcher` 桥成 `rag.Retriever`(`Filter` 用来把检索限定在评测语料,如某测试 user_id/kb_id)。hermetic 单测用 fake `Retriever`。
 
-**数据集**:每条用例的 `expect` 带 golden 标注与阈值:
+**数据集**:每条用例的 `expect` 只存 golden 等**客观标注**(阈值另见"阈值剖面"一节):
 | 键 | 含义 |
 |---|---|
 | `relevant_ids` | golden 相关文档/chunk 身份数组(缺失则所有指标跳过) |
-| `match_on` | `doc`(默认,按 `Source.SourceID`)或 `chunk`(按 chunk id) |
+| `match_on` | `doc`(默认,按 `Source.SourceID`)、`chunk`(按 chunk id)或 `name`(按文档名,便于可读标注) |
 | `k` | 截断的 top-k(覆盖 runner 的 TopK) |
-| `recall_min`/`precision_min`/`hit_min`/`mrr_min`/`ndcg_min` | 各指标通过阈值(缺省 0=只记录不 gate) |
+| `expect_low_relevance` / `expect_no_results` | 负例断言(见下) |
 
 **指标**(确定性、无 LLM,均归一化到 0..1):
 
@@ -106,8 +106,8 @@ rep, _ := e.Run(ctx, ds)           // 产出的是同一个 eval.Report,可 Diff
 | `MAP` | 各相关命中位置 P@k 的平均——对"多个相关文档是否都靠前"敏感 | `map_min` |
 | `F1AtK` | Precision/Recall 的调和平均,适合做总体门禁 | `f1_min` |
 
-**要让回归门禁抓到检索质量跌落**,数据集需为关键用例设 `*_min` 阈值——指标跌破阈值即
-pass→fail,`Diff` 才捕获。阈值应取**实测绿色运行的保守下界**,而非拍脑袋。
+**要让回归门禁抓到检索质量跌落**,需为关键用例设 `*_min` 阈值(放在阈值剖面里)——指标
+跌破阈值即 pass→fail,`Diff` 才捕获。阈值应取**实测绿色运行的保守下界**,而非拍脑袋。
 
 **负例(库里没有答案的问题)**:`LowRelevanceIs`(`expect_low_relevance`)断言生产的低相关
 判定;`NoResults`(`expect_no_results`)断言检索为空(如越权/越库必须查不到)。
@@ -167,9 +167,8 @@ EVAL_WRITE_BASELINE=1 go test ./internal/eval/rag/ -tags ragreal -run TestRealDa
 go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
 ```
 
-实测基线(7 文档 / 75 chunk / top_k=5):recall\@5 **1.000**、hit\_rate **1.000**、
-MRR **1.000**、nDCG **0.9866**、precision\@5 **0.5972**,pass\_rate 100%。阈值取实测值的
-保守下界写进数据集,使门禁能抓回归又不抖动。
+实测基线见下方"实测对比"表(两套向量模型各一份基线,pass_rate 均 100%)。阈值取实测值的
+保守下界,放在**阈值剖面**里(见"阈值剖面"一节),使门禁能抓回归又不抖动。
 
 #### 向量模型:GLM embedding-3(真实语义)或 HashEmbedder(离线)
 
