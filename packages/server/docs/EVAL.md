@@ -131,7 +131,7 @@ cmp.Best("ndcg")                      // 该指标下最优配置名
 cmp.Delta("balanced", "bm25-heavy")   // 逐指标均值差(正=候选更好)
 ```
 
-真实语料实测(见 `TestRealDataWeightComparison`),bm25-heavy 相对 balanced:
+真实语料实测(见 `TestRealDataWeightComparison`,**词形 HashEmbedder 下**),bm25-heavy 相对 balanced:
 
 | 指标 | 变化 |
 |---|---|
@@ -196,9 +196,47 @@ GLM 的 `/embeddings` 与 OpenAI 同构,故直接复用仓库既有的 OpenAI �
 负责把 `llm.Client` 适配成评测所需的批量+单条嵌入接口,并按 `GLMEmbeddingBatchSize`
 切批(真实向量服务对单请求输入条数有上限)。
 
-**两种向量模型各自隔离**:collection/index 与基线文件均按嵌入器区分
-(`cove_eval_chunks` / `cove_eval_chunks_glm_<dim>`,`cove-docs.json` / `cove-docs-glm.json`),
-避免维度不匹配与指标互相污染。
+**两种向量模型各自隔离**:collection/index、基线、**阈值剖面**均按嵌入器区分
+(`cove_eval_chunks` / `cove_eval_chunks_glm_<dim>`,`baselines/cove-docs{,-glm}.json`,
+`thresholds/{hash,glm}.json`),避免维度不匹配与指标互相污染。
+
+#### 实测对比:GLM embedding-3 vs 词形 HashEmbedder
+
+同一冻结语料(7 篇 / 78 chunk)、同一批 12 条 golden 标注查询、同一混合检索链路,top_k=5:
+
+| 指标 | hash(词形) | **GLM embedding-3** |
+|---|---|---|
+| recall@5 | 0.9583 | **1.0000** |
+| precision@5 | 0.6389 | **0.8889** |
+| F1 | 0.7167 | **0.9278** |
+| nDCG | 0.9933 | **1.0000** |
+| MAP | 0.9861 | **1.0000** |
+| MRR | 1.0000 | 1.0000 |
+
+语义向量在每一项上都不劣于词形,precision/F1 提升尤其明显(+0.25 / +0.21)。
+
+**负例判定(域外问题)—— 语义向量才做得到**:
+
+| 向量模型 | 域内 max_score | 域外 max_score | 是否可分 |
+|---|---|---|---|
+| hash(词形) | [0.2094, 0.4503] | [0.2306, 0.2464] | ✗ 区间重叠,无可分阈值 |
+| **GLM embedding-3** | **[0.5957, 0.7852]** | **[0.3614, 0.3897]** | ✓ 间隔 0.206,阈值取 0.49 |
+
+故 `TestRealDataNegativeGate` 仅在 GLM 下执行(hash 下自动 skip 而非给假绿),
+实测 **15/15 通过**(3 条域外正确判低相关 + 12 条域内无误判)。
+校准工具:`TestRealDataNegativeCalibration` 打印两侧分数区间并给出建议阈值。
+
+### 阈值剖面:把"客观事实"与"对配置的期望"分开
+
+数据集只存 **golden 标注等客观事实**(`relevant_ids`/`match_on`/`k`);各指标的 `*_min`
+阈值放在 `testdata/thresholds/<profile>.json`,载入时经 `eval.ThresholdProfile.ApplyTo` 合并。
+
+理由:golden 是"哪些文档确实相关"的事实,换向量模型不会变;阈值是"该配置应达到的水平",
+换配置必然变。混在一起会导致换模型就要改 golden。拆开后一份数据集可配多套剖面
+(词形一套、语义一套),各自门禁互不牵连——实测正是如此:同一份 golden 下 hash 的
+recall 只有 0.9583 而 GLM 是 1.0000,两者各按自己的剖面 100% 通过。
+
+剖面中出现数据集里不存在的 case_id 会**报错**,挡住改名/拼写导致的"阈值静默失效"。
 
 - `HashEmbedder`:字符 bigram 特征哈希 + L2 归一化,无需 API key、完全可复现,配合 ES 的
   真实 BM25 通道即可产出有意义的混合排序;但只有词形信号,无法分辨域外问题(见下方负例局限)。
@@ -208,11 +246,9 @@ GLM 的 `/embeddings` 与 OpenAI 同构,故直接复用仓库既有的 OpenAI �
 `docs/EVAL.md`,而记录这套评测本身就会改它——活文档一变,chunk 与检索结果随之变化,基线
 悄悄失效(实测 nDCG 0.9866→0.9933)。更新语料时须同步刷新快照与基线。
 
-**负例的已知局限(未纳入门禁)**:`testdata/datasets/cove-docs-negatives.json` 存放 3 条域外
-问题。实测其最高向量分(0.2306–0.2464)**落在域内问题区间内**(0.2094–0.4503),`neg-cooking`
-的 0.2464 甚至高于 `q-langfuse-quickstart` 的 0.2094 —— **不存在能分开二者的阈值**。这是词形
-`HashEmbedder` 的固有局限(中文字符 bigram 在任意文本间都有相似度地板),换真实语义嵌入模型
-后分离度才会拉开。`LowRelevanceIs`/`NoResults` 打分器本身已单测覆盖,可随时启用。
+**负例门禁**:域外问题存放在 `testdata/datasets/cove-docs-negatives.json`。词形
+`HashEmbedder` 下域内/域外分数区间重叠、无可分阈值(故不启用,不给假绿);换成 GLM
+embedding-3 后间隔达 0.206,门禁已启用并 15/15 通过。数据见上文"负例判定"表。
 
 **两个真实数据才暴露的问题(已修)**:
 1. **nDCG 溢出 (0,1]**:doc 级匹配下同一文档有多个 chunk 命中,逐 chunk 计入会让 DCG 重复

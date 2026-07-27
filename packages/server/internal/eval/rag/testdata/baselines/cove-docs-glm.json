@@ -16,9 +16,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 0.3333333333333333,
+          "value": 1,
           "passed": true,
-          "detail": "0.3333 (min 0.3000)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "hit_rate",
@@ -46,9 +46,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.5,
+          "value": 1,
           "passed": true,
-          "detail": "0.5000 (min 0.4500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "low_relevance",
@@ -58,7 +58,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
+      "latency_ms": 224,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -79,9 +79,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 0.3333333333333333,
+          "value": 1,
           "passed": true,
-          "detail": "0.3333 (min 0.3000)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "hit_rate",
@@ -109,9 +109,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.5,
+          "value": 1,
           "passed": true,
-          "detail": "0.5000 (min 0.4500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "low_relevance",
@@ -121,7 +121,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 5,
+      "latency_ms": 207,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -142,9 +142,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 0.3333333333333333,
+          "value": 1,
           "passed": true,
-          "detail": "0.3333 (min 0.3000)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "hit_rate",
@@ -172,9 +172,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.5,
+          "value": 1,
           "passed": true,
-          "detail": "0.5000 (min 0.4500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "low_relevance",
@@ -184,7 +184,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
+      "latency_ms": 244,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -247,7 +247,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 7,
+      "latency_ms": 208,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -268,9 +268,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 0.6666666666666666,
+          "value": 1,
           "passed": true,
-          "detail": "0.6667 (min 0.6500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "hit_rate",
@@ -298,9 +298,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.8,
+          "value": 1,
           "passed": true,
-          "detail": "0.8000 (min 0.7500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "low_relevance",
@@ -310,7 +310,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 9,
+      "latency_ms": 304,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -373,7 +373,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
+      "latency_ms": 204,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -381,6 +381,69 @@
     },
     {
       "case_id": "q-vectorstore-ports",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 313,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-hybrid-fusion",
       "tags": [
         "rag"
       ],
@@ -436,70 +499,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
-      "iterations": 0,
-      "total_tokens": 0,
-      "cost_usd": 0,
-      "stop_reason": ""
-    },
-    {
-      "case_id": "q-hybrid-fusion",
-      "tags": [
-        "rag"
-      ],
-      "passed": true,
-      "scores": [
-        {
-          "scorer": "recall_at_k",
-          "value": 1,
-          "passed": true,
-          "detail": "1.0000 (min 0.9500)"
-        },
-        {
-          "scorer": "precision_at_k",
-          "value": 0.3333333333333333,
-          "passed": true,
-          "detail": "0.3333 (min 0.3000)"
-        },
-        {
-          "scorer": "hit_rate",
-          "value": 1,
-          "passed": true,
-          "detail": "1.0000 (min 0.9500)"
-        },
-        {
-          "scorer": "mrr",
-          "value": 1,
-          "passed": true,
-          "detail": "1.0000 (min 0.9500)"
-        },
-        {
-          "scorer": "ndcg",
-          "value": 1,
-          "passed": true,
-          "detail": "1.0000 (min 0.9500)"
-        },
-        {
-          "scorer": "map",
-          "value": 1,
-          "passed": true,
-          "detail": "1.0000 (min 0.9500)"
-        },
-        {
-          "scorer": "f1_at_k",
-          "value": 0.5,
-          "passed": true,
-          "detail": "0.5000 (min 0.4500)"
-        },
-        {
-          "scorer": "low_relevance",
-          "value": 0,
-          "passed": true,
-          "skipped": true,
-          "detail": "skipped: no relevant_ids"
-        }
-      ],
-      "latency_ms": 6,
+      "latency_ms": 188,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -562,7 +562,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 7,
+      "latency_ms": 341,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -577,9 +577,9 @@
       "scores": [
         {
           "scorer": "recall_at_k",
-          "value": 0.5,
+          "value": 1,
           "passed": true,
-          "detail": "0.5000 (min 0.4500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "precision_at_k",
@@ -613,9 +613,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.6666666666666666,
+          "value": 1,
           "passed": true,
-          "detail": "0.6667 (min 0.6500)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "low_relevance",
@@ -625,7 +625,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 5,
+      "latency_ms": 321,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -688,7 +688,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
+      "latency_ms": 210,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -728,15 +728,15 @@
         },
         {
           "scorer": "ndcg",
-          "value": 0.9197207891481877,
+          "value": 1,
           "passed": true,
-          "detail": "0.9197 (min 0.9000)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "map",
-          "value": 0.8333333333333333,
+          "value": 1,
           "passed": true,
-          "detail": "0.8333 (min 0.8000)"
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "f1_at_k",
@@ -752,7 +752,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 6,
+      "latency_ms": 310,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -768,7 +768,7 @@
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.7166666666666667
+      "mean_value": 0.9277777777777779
     },
     "hit_rate": {
       "scorer": "hit_rate",
@@ -795,7 +795,7 @@
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.9861111111111112
+      "mean_value": 1
     },
     "mrr": {
       "scorer": "mrr",
@@ -813,7 +813,7 @@
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.993310065762349
+      "mean_value": 1
     },
     "precision_at_k": {
       "scorer": "precision_at_k",
@@ -822,7 +822,7 @@
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.638888888888889
+      "mean_value": 0.8888888888888888
     },
     "recall_at_k": {
       "scorer": "recall_at_k",
@@ -831,7 +831,7 @@
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.9583333333333334
+      "mean_value": 1
     }
   }
 }

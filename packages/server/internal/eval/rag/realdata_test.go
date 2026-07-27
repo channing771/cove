@@ -46,7 +46,8 @@ const (
 	// 词形 HashEmbedder 下两者区间重叠、无可分阈值(取 0 即不触发);GLM 语义向量下
 	// 由 glmLowRelevanceThreshold 生效。
 	lowRelevanceThreshold    = 0.0
-	glmLowRelevanceThreshold = 0.0
+	// GLM 实测:域内 [0.5957, 0.7852]、域外 [0.3614, 0.3897],取中间值留足两侧余量。
+	glmLowRelevanceThreshold = 0.49
 )
 
 // embedderSetup 描述本次评测使用的向量模型及其配套的隔离参数。
@@ -59,6 +60,7 @@ type embedderSetup struct {
 	dim        int
 	collection string
 	baseline   string
+	thresholds string
 	lowThresh  float64
 }
 
@@ -78,6 +80,7 @@ func resolveEmbedder(t *testing.T) embedderSetup {
 			dim:        512,
 			collection: "cove_eval_chunks",
 			baseline:   filepath.Join("testdata", "baselines", "cove-docs.json"),
+			thresholds: filepath.Join("testdata", "thresholds", "hash.json"),
 			lowThresh:  lowRelevanceThreshold,
 		}
 	}
@@ -100,6 +103,7 @@ func resolveEmbedder(t *testing.T) embedderSetup {
 		dim:        dim,
 		collection: fmt.Sprintf("cove_eval_chunks_glm_%d", dim),
 		baseline:   filepath.Join("testdata", "baselines", "cove-docs-glm.json"),
+		thresholds: filepath.Join("testdata", "thresholds", "glm.json"),
 		lowThresh:  glmLowRelevanceThreshold,
 	}
 }
@@ -134,6 +138,26 @@ func corpusPaths() []string {
 	return paths
 }
 
+// loadDatasetWithThresholds 载入数据集并合入该向量模型对应的阈值剖面。
+//
+// 数据集只存 golden 等客观标注;阈值是"对某一配置的期望",按 setup 选择剖面,
+// 使词形与语义两套配置各有独立门禁、互不牵连。
+func loadDatasetWithThresholds(t *testing.T, path string, setup embedderSetup) (*eval.Dataset, error) {
+	t.Helper()
+	ds, err := eval.LoadDataset(path)
+	if err != nil {
+		return nil, err
+	}
+	profile, err := eval.LoadThresholds(setup.thresholds)
+	if err != nil {
+		return nil, err
+	}
+	if err := profile.ApplyTo(ds); err != nil {
+		return nil, err
+	}
+	return ds, nil
+}
+
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -165,7 +189,7 @@ func TestRealDataRetrievalEval(t *testing.T) {
 	}
 
 	// --- 自建数据集 → 评测 ---
-	ds, err := eval.LoadDataset("testdata/datasets/cove-docs.json")
+	ds, err := loadDatasetWithThresholds(t, "testdata/datasets/cove-docs.json", setup)
 	if err != nil {
 		t.Fatalf("load dataset: %v", err)
 	}
@@ -231,6 +255,117 @@ func TestRealDataRetrievalEval(t *testing.T) {
 	}
 }
 
+// TestRealDataNegativeGate 用负例数据集验证:知识库外的问题必须被判为低相关。
+//
+// 仅在使用真实语义向量(GLM)时有意义并执行——词形 HashEmbedder 下域内/域外分数区间
+// 重叠,不存在无误判的阈值,故自动跳过而非给出假绿。
+//
+//	GLM_API_KEY=... go test ./internal/eval/rag/ -tags ragreal -run TestRealDataNegativeGate -v
+func TestRealDataNegativeGate(t *testing.T) {
+	ctx := context.Background()
+	dense, keyword, setup := setupRealStores(ctx, t)
+	if setup.lowThresh <= 0 {
+		t.Skipf("当前向量模型(%s)无可分的低相关阈值,跳过负例门禁", setup.name)
+	}
+	t.Logf("向量模型: %s | 低相关阈值=%.2f", setup.name, setup.lowThresh)
+
+	repo := ragchunk.NewRepository(dense, keyword)
+	searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
+		ragsearch.WithEmbeddingDim(setup.dim),
+		ragsearch.WithEmbedder(setup.embedder),
+		ragsearch.WithLowRelevanceThreshold(setup.lowThresh),
+		ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
+	retriever := ragadapter.SearcherRetriever{
+		Searcher: searcher,
+		Embedder: setup.embedder,
+		Filter:   vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}},
+	}
+
+	negatives, err := eval.LoadDataset("testdata/datasets/cove-docs-negatives.json")
+	if err != nil {
+		t.Fatalf("load negatives: %v", err)
+	}
+	// 域内用例同时参与:确保阈值不会把正常问题误判为低相关(假阳性)。
+	positives, err := eval.LoadDataset("testdata/datasets/cove-docs.json")
+	if err != nil {
+		t.Fatalf("load positives: %v", err)
+	}
+	for i := range positives.Cases {
+		positives.Cases[i].Expect["expect_low_relevance"] = false
+	}
+	combined := &eval.Dataset{Name: "cove-docs-relevance", Cases: append(negatives.Cases, positives.Cases...)}
+
+	e := &rag.Evaluator{
+		Runner:  &rag.RetrievalRunner{Retriever: retriever, TopK: 5},
+		Scorers: []rag.Scorer{rag.LowRelevanceIs()},
+	}
+	rep, err := e.Run(ctx, combined)
+	if err != nil {
+		t.Fatalf("eval run: %v", err)
+	}
+	_ = rep.WriteTable(logWriter{t})
+	agg := rep.Scorers["low_relevance"]
+	t.Logf("low_relevance: pass=%d fail=%d (域外 %d 条 + 域内 %d 条)", agg.Passed, agg.Failed, len(negatives.Cases), len(positives.Cases))
+	if rep.PassRate != 1 {
+		t.Errorf("低相关判定 pass_rate = %.2f%%, want 100%%", rep.PassRate*100)
+	}
+}
+
+// TestRealDataNegativeCalibration 打印域内/域外问题的最高向量分,用于校准低相关阈值。
+//
+// 只有当域外问题的分数明显低于域内问题时,低相关判定(以及基于它的负例门禁)才有意义。
+// 词形 HashEmbedder 下两者区间重叠、无可分阈值;真实语义向量下应拉开距离。
+//
+//	go test ./internal/eval/rag/ -tags ragreal -run TestRealDataNegativeCalibration -v
+func TestRealDataNegativeCalibration(t *testing.T) {
+	ctx := context.Background()
+	dense, keyword, setup := setupRealStores(ctx, t)
+	t.Logf("向量模型: %s", setup.name)
+
+	repo := ragchunk.NewRepository(dense, keyword)
+	searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
+		ragsearch.WithEmbeddingDim(setup.dim),
+		ragsearch.WithEmbedder(setup.embedder),
+		ragsearch.WithLowRelevanceThreshold(setup.lowThresh),
+		ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
+	retriever := ragadapter.SearcherRetriever{
+		Searcher: searcher,
+		Embedder: setup.embedder,
+		Filter:   vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}},
+	}
+
+	collect := func(path, label string) (lo, hi float64) {
+		ds, err := eval.LoadDataset(path)
+		if err != nil {
+			t.Fatalf("load %s: %v", path, err)
+		}
+		lo, hi = 1e9, -1e9
+		for _, c := range ds.Cases {
+			_, rel, err := retriever.RetrieveWithRelevance(ctx, c.Query, 5)
+			if err != nil {
+				t.Fatalf("retrieve %s: %v", c.ID, err)
+			}
+			score := 0.0
+			if rel.MaxScore != nil {
+				score = *rel.MaxScore
+			}
+			lo, hi = min(lo, score), max(hi, score)
+			t.Logf("%-8s [%-22s] max_score=%.4f  %q", label, c.ID, score, c.Query)
+		}
+		return lo, hi
+	}
+
+	posLo, posHi := collect("testdata/datasets/cove-docs.json", "域内")
+	negLo, negHi := collect("testdata/datasets/cove-docs-negatives.json", "域外")
+
+	t.Logf("域内区间 [%.4f, %.4f] | 域外区间 [%.4f, %.4f]", posLo, posHi, negLo, negHi)
+	if negHi < posLo {
+		t.Logf("✓ 可分:建议低相关阈值取 (%.4f, %.4f) 之间,例如 %.4f", negHi, posLo, (negHi+posLo)/2)
+	} else {
+		t.Logf("✗ 不可分:域外最高分 %.4f >= 域内最低分 %.4f,不存在无误判的阈值(负例门禁不应启用)", negHi, posLo)
+	}
+}
+
 // TestRealDataWeightComparison 用同一真实语料与数据集横向对比不同融合权重,
 // 演示 RAG 调参的主用途:量化"向量权重调高/调低"对检索质量的实际影响。
 //
@@ -259,7 +394,7 @@ func TestRealDataWeightComparison(t *testing.T) {
 		}
 	}
 
-	ds, err := eval.LoadDataset("testdata/datasets/cove-docs.json")
+	ds, err := loadDatasetWithThresholds(t, "testdata/datasets/cove-docs.json", setup)
 	if err != nil {
 		t.Fatalf("load dataset: %v", err)
 	}

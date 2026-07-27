@@ -12,14 +12,7 @@
           "README.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.3,
-        "map_min": 0.95,
-        "f1_min": 0.45
+        "k": 5
       }
     },
     {
@@ -33,14 +26,7 @@
           "README.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.3,
-        "map_min": 0.95,
-        "f1_min": 0.45
+        "k": 5
       }
     },
     {
@@ -54,14 +40,7 @@
           "2026-07-26-agent-harness-enterprise-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.3,
-        "map_min": 0.95,
-        "f1_min": 0.45
+        "k": 5
       }
     },
     {
@@ -75,14 +54,7 @@
           "2026-07-26-agent-harness-enterprise-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.95,
-        "map_min": 0.95,
-        "f1_min": 0.95
+        "k": 5
       }
     },
     {
@@ -97,14 +69,7 @@
           "2026-07-26-llm-observability-otel-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.9,
-        "precision_min": 0.6,
-        "map_min": 0.95,
-        "f1_min": 0.75
+        "k": 5
       }
     },
     {
@@ -118,14 +83,7 @@
           "OBSERVABILITY.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.3,
-        "map_min": 0.95,
-        "f1_min": 0.65
+        "k": 5
       }
     },
     {
@@ -139,14 +97,7 @@
           "2026-07-26-vector-store-abstraction-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.45,
-        "map_min": 0.95,
-        "f1_min": 0.65
+        "k": 5
       }
     },
     {
@@ -160,14 +111,7 @@
           "2026-07-26-vector-store-abstraction-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.3,
-        "map_min": 0.95,
-        "f1_min": 0.45
+        "k": 5
       }
     },
     {
@@ -181,14 +125,7 @@
           "EVAL.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.45,
-        "map_min": 0.95,
-        "f1_min": 0.95
+        "k": 5
       }
     },
     {
@@ -199,17 +136,11 @@
       ],
       "expect": {
         "relevant_ids": [
-          "EVAL.md"
+          "EVAL.md",
+          "2026-07-26-agent-eval-system-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.95,
-        "map_min": 0.95,
-        "f1_min": 0.95
+        "k": 5
       }
     },
     {
@@ -224,14 +155,7 @@
           "2026-07-26-agent-eval-system-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.95,
-        "precision_min": 0.95,
-        "map_min": 0.95,
-        "f1_min": 0.95
+        "k": 5
       }
     },
     {
@@ -247,14 +171,7 @@
           "2026-07-26-agent-harness-enterprise-design.md"
         ],
         "match_on": "name",
-        "k": 5,
-        "recall_min": 1.0,
-        "hit_min": 1.0,
-        "mrr_min": 1.0,
-        "ndcg_min": 0.9,
-        "precision_min": 0.6,
-        "map_min": 0.8,
-        "f1_min": 0.75
+        "k": 5
       }
     }
   ]

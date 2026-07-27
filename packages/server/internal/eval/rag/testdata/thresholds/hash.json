@@ -1,0 +1,110 @@
+{
+  "q-react-dual-path": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-agent-phase": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-harness-pillars": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-harness-resilience": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-langfuse-quickstart": {
+    "recall_min": 0.95,
+    "precision_min": 0.65,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.75
+  },
+  "q-otel-config": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-vectorstore-ports": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-hybrid-fusion": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-rag-metrics": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-expect-keys": {
+    "recall_min": 0.45,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-eval-layers": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-cassette": {
+    "recall_min": 0.95,
+    "precision_min": 0.65,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.9,
+    "map_min": 0.8,
+    "f1_min": 0.75
+  }
+}
