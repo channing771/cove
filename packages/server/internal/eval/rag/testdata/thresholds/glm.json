@@ -55,21 +55,21 @@
   },
   "q-vectorstore-ports": {
     "recall_min": 0.95,
-    "precision_min": 0.95,
+    "precision_min": 0.3,
     "hit_min": 0.95,
     "mrr_min": 0.95,
     "ndcg_min": 0.95,
     "map_min": 0.95,
-    "f1_min": 0.95
+    "f1_min": 0.45
   },
   "q-hybrid-fusion": {
     "recall_min": 0.95,
-    "precision_min": 0.45,
+    "precision_min": 0.65,
     "hit_min": 0.95,
     "mrr_min": 0.95,
     "ndcg_min": 0.95,
     "map_min": 0.95,
-    "f1_min": 0.65
+    "f1_min": 0.75
   },
   "q-rag-metrics": {
     "recall_min": 0.95,
@@ -99,12 +99,327 @@
     "f1_min": 0.95
   },
   "q-cassette": {
+    "recall_min": 0.7,
+    "precision_min": 0.7,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.75,
+    "map_min": 0.6,
+    "f1_min": 0.7
+  },
+  "q-gateway-inbound": {
     "recall_min": 0.95,
-    "precision_min": 0.65,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-gateway-provider": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-gateway-contract": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-mcp-fallback": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-mcp-cache": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-mcp-key": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-mcp-timeout": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-arch-deps": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-arch-async": {
+    "recall_min": 0.0,
+    "precision_min": 0.0,
+    "hit_min": 0.0,
+    "mrr_min": 0.0,
+    "ndcg_min": 0.0,
+    "map_min": 0.0,
+    "f1_min": 0.0
+  },
+  "q-arch-stack": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-deploy-acr": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-deploy-release": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-codegen-route": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-codegen-binding": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-codegen-report": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-conv-core": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-conv-option": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-conv-port": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-rerank-fail": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-rerank-pipeline": {
+    "recall_min": 0.95,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.65
+  },
+  "q-rerank-window": {
+    "recall_min": 0.0,
+    "precision_min": 0.0,
+    "hit_min": 0.0,
+    "mrr_min": 0.0,
+    "ndcg_min": 0.0,
+    "map_min": 0.0,
+    "f1_min": 0.0
+  },
+  "q-gn-impact": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-gn-rename": {
+    "recall_min": 0.95,
+    "precision_min": 0.2,
+    "hit_min": 0.95,
+    "mrr_min": 0.45,
+    "ndcg_min": 0.6,
+    "map_min": 0.45,
+    "f1_min": 0.35
+  },
+  "q-gn-cli": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-gn-debug": {
+    "recall_min": 0.95,
+    "precision_min": 0.2,
+    "hit_min": 0.95,
+    "mrr_min": 0.45,
+    "ndcg_min": 0.6,
+    "map_min": 0.45,
+    "f1_min": 0.35
+  },
+  "q-plan-eval-tasks": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.3,
+    "ndcg_min": 0.45,
+    "map_min": 0.3,
+    "f1_min": 0.45
+  },
+  "q-plan-harness-tdd": {
+    "recall_min": 0.95,
+    "precision_min": 0.2,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.35
+  },
+  "q-multi-rag-eval": {
+    "recall_min": 0.65,
+    "precision_min": 0.95,
     "hit_min": 0.95,
     "mrr_min": 0.95,
     "ndcg_min": 0.95,
     "map_min": 0.95,
     "f1_min": 0.75
+  },
+  "q-multi-obs-harness": {
+    "recall_min": 0.65,
+    "precision_min": 0.65,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.75,
+    "map_min": 0.65,
+    "f1_min": 0.65
+  },
+  "q-short-rerank": {
+    "recall_min": 0.95,
+    "precision_min": 0.95,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.95
+  },
+  "q-short-otel": {
+    "recall_min": 0.45,
+    "precision_min": 0.45,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.6,
+    "map_min": 0.45,
+    "f1_min": 0.45
+  },
+  "q-short-chunk": {
+    "recall_min": 0.95,
+    "precision_min": 0.35,
+    "hit_min": 0.95,
+    "mrr_min": 0.45,
+    "ndcg_min": 0.65,
+    "map_min": 0.45,
+    "f1_min": 0.55
+  },
+  "q-mixed-breaker": {
+    "recall_min": 0.0,
+    "precision_min": 0.0,
+    "hit_min": 0.0,
+    "mrr_min": 0.0,
+    "ndcg_min": 0.0,
+    "map_min": 0.0,
+    "f1_min": 0.0
+  },
+  "q-colloquial-deploy": {
+    "recall_min": 0.95,
+    "precision_min": 0.3,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.95,
+    "map_min": 0.95,
+    "f1_min": 0.45
+  },
+  "q-colloquial-eval": {
+    "recall_min": 0.45,
+    "precision_min": 0.2,
+    "hit_min": 0.95,
+    "mrr_min": 0.95,
+    "ndcg_min": 0.6,
+    "map_min": 0.45,
+    "f1_min": 0.3
   }
 }

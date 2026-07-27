@@ -20,11 +20,14 @@ package rag_test
 import (
 	"context"
 	"fmt"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -46,8 +49,8 @@ const (
 	// 词形 HashEmbedder 下两者区间重叠、无可分阈值(取 0 即不触发);GLM 语义向量下
 	// 由 glmLowRelevanceThreshold 生效。
 	lowRelevanceThreshold    = 0.0
-	// GLM 实测:域内 [0.5957, 0.7852]、域外 [0.3614, 0.3897],取中间值留足两侧余量。
-	glmLowRelevanceThreshold = 0.49
+	// GLM 在 26 篇语料上实测:域内 [0.5589, 0.7852]、域外 [0.3794, 0.4171],取中间值留余量。
+	glmLowRelevanceThreshold = 0.488
 )
 
 // embedderSetup 描述本次评测使用的向量模型及其配套的隔离参数。
@@ -115,24 +118,33 @@ func resolveEmbedder(t *testing.T) embedderSetup {
 // 冻结并随基线一起版本化;要更新语料时,同步刷新快照与基线。
 const corpusDir = "testdata/corpus"
 
-// corpusFiles 是语料文件名(相对 corpusDir),其 base name 即数据集里的 golden 标注。
-var corpusFiles = []string{
-	"EVAL.md",
-	"OBSERVABILITY.md",
-	"README.md",
-	"2026-07-26-agent-harness-enterprise-design.md",
-	"2026-07-26-llm-observability-otel-design.md",
-	"2026-07-26-vector-store-abstraction-design.md",
-	"2026-07-26-agent-eval-system-design.md",
+// corpusFiles 直接读取快照目录,避免"文件已加入快照却漏改列表"导致语料静默缺失
+// (曾因此把 26 篇语料当成 7 篇跑,recall 塌到 0.27)。快照目录本身即冻结边界。
+func corpusFiles(t *testing.T) []string {
+	t.Helper()
+	entries, err := os.ReadDir(corpusDir)
+	if err != nil {
+		t.Fatalf("read corpus dir: %v", err)
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+			out = append(out, e.Name())
+		}
+	}
+	sort.Strings(out) // 顺序固定,保证摄入与结果可复现
+	return out
 }
 
 // evalUser 固定评测语料归属,使检索过滤与生产一致(按 user_id 隔离)。
 var evalUser = corpus.DeterministicID("eval-user")
 
 // corpusPaths 返回冻结语料快照中各文件的路径。
-func corpusPaths() []string {
-	paths := make([]string, 0, len(corpusFiles))
-	for _, f := range corpusFiles {
+func corpusPaths(t *testing.T) []string {
+	t.Helper()
+	files := corpusFiles(t)
+	paths := make([]string, 0, len(files))
+	for _, f := range files {
 		paths = append(paths, filepath.Join(corpusDir, f))
 	}
 	return paths
@@ -389,6 +401,77 @@ func TestRealDataNegativeGate(t *testing.T) {
 	}
 }
 
+// TestRealDataEmbedderComparison 在同一语料/同一批 golden 上对比两种向量模型,
+// 并给出配对置信区间——回答"换成真实语义向量到底提升多少、是否站得住"。
+//
+// 需要 GLM key;未配置时跳过(无从对比)。两种模型各自灌入独立 collection。
+//
+//	GLM_API_KEY=... go test ./internal/eval/rag/ -tags ragreal -run TestRealDataEmbedderComparison -v
+func TestRealDataEmbedderComparison(t *testing.T) {
+	ctx := context.Background()
+	if os.Getenv("GLM_API_KEY") == "" && os.Getenv("ZHIPU_API_KEY") == "" {
+		t.Skip("未配置 GLM key,跳过跨嵌入器对比")
+	}
+	glm := resolveEmbedder(t)
+	hash := embedderSetup{
+		name: "hash(词形)", embedder: corpus.NewHashEmbedder(512), dim: 512,
+		collection: "cove_eval_chunks", thresholds: filepath.Join("testdata", "thresholds", "hash.json"),
+	}
+
+	build := func(setup embedderSetup) rag.Variant {
+		dense, keyword := openStores(t, setup)
+		resetStores(t, setup)
+		ingestCorpus(ctx, t, setup, dense, keyword)
+		repo := ragchunk.NewRepository(dense, keyword)
+		searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
+			ragsearch.WithEmbeddingDim(setup.dim),
+			ragsearch.WithEmbedder(setup.embedder),
+			ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
+		return rag.Variant{
+			Name: setup.name,
+			Runner: &rag.RetrievalRunner{
+				Retriever: ragadapter.SearcherRetriever{
+					Searcher: searcher, Embedder: setup.embedder,
+					Filter: vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}},
+				},
+				TopK: 5,
+			},
+		}
+	}
+	variants := []rag.Variant{build(hash), build(glm)}
+
+	ds, err := eval.LoadDataset("testdata/datasets/cove-docs.json")
+	if err != nil {
+		t.Fatalf("load dataset: %v", err)
+	}
+	cmp, err := (&rag.Comparer{
+		Variants: variants,
+		Scorers: []rag.Scorer{
+			rag.RecallAtK(), rag.PrecisionAtK(), rag.HitRate(),
+			rag.MRR(), rag.NDCG(), rag.MAP(), rag.F1AtK(),
+		},
+	}).Run(ctx, ds)
+	if err != nil {
+		t.Fatalf("compare: %v", err)
+	}
+
+	t.Logf("语料 %d 篇 / 用例 %d 条", len(corpusFiles(t)), len(ds.Cases))
+	sig := 0
+	for _, d := range cmp.DeltaWithCI(hash.name, glm.name, 0.95, 2000, 1) {
+		mark := "不显著"
+		if d.Significant {
+			mark = "显著"
+			sig++
+		}
+		t.Logf("  %-16s %.4f → %.4f  delta=%+.4f  95%%CI=[%+.4f, %+.4f]  %s",
+			d.Scorer, d.Base, d.Candidate, d.Delta, d.CI.Lo, d.CI.Hi, mark)
+	}
+	t.Logf("GLM 相对 hash:%d 项指标提升达到统计显著(n=%d)", sig, len(ds.Cases))
+	if sig == 0 {
+		t.Error("样本量下未能检出任何显著差异,对比结论不足以支撑决策")
+	}
+}
+
 // TestRealDataNegativeCalibration 打印域内/域外问题的最高向量分,用于校准低相关阈值。
 //
 // 只有当域外问题的分数明显低于域内问题时,低相关判定(以及基于它的负例门禁)才有意义。
@@ -538,12 +621,13 @@ func openStores(t *testing.T, setup embedderSetup) (*qdrant.DenseIndex, *es.Keyw
 // ingestCorpus 把冻结语料经生产链路灌入检索存储。
 func ingestCorpus(ctx context.Context, t *testing.T, setup embedderSetup, dense *qdrant.DenseIndex, keyword *es.KeywordIndex) {
 	t.Helper()
-	docs, err := corpus.LoadFiles(corpusPaths(), corpus.LoadOptions{UserID: evalUser, Root: corpusDir})
+	want := corpusFiles(t)
+	docs, err := corpus.LoadFiles(corpusPaths(t), corpus.LoadOptions{UserID: evalUser, Root: corpusDir})
 	if err != nil {
 		t.Fatalf("load corpus: %v", err)
 	}
-	if len(docs) != len(corpusFiles) {
-		t.Fatalf("loaded %d docs, want %d", len(docs), len(corpusFiles))
+	if len(docs) != len(want) {
+		t.Fatalf("loaded %d docs, want %d", len(docs), len(want))
 	}
 	ingester := &corpus.Ingester{Dense: dense, Keyword: keyword, Embedder: setup.embedder, Dim: setup.dim}
 	chunks, err := ingester.Ingest(ctx, docs)
@@ -551,7 +635,7 @@ func ingestCorpus(ctx context.Context, t *testing.T, setup embedderSetup, dense 
 		t.Fatalf("ingest: %v", err)
 	}
 	t.Logf("已把 %d 篇真实文档灌入 Qdrant+ES,共 %d 个 chunk", len(docs), chunks)
-	waitSearchable(ctx, t, keyword)
+	waitIndexed(ctx, t, setup, keyword, chunks)
 }
 
 // setupRealStores 复位并灌入语料,返回可用于检索的存储与嵌入器。
@@ -589,18 +673,60 @@ func resetStores(t *testing.T, setup embedderSetup) {
 	del(env("QDRANT_HTTP", "http://localhost:6333") + "/collections/" + setup.collection)
 }
 
-// waitSearchable 等 ES 刷新可见(近实时索引),避免刚写入就检索不到。
-func waitSearchable(ctx context.Context, t *testing.T, keyword *es.KeywordIndex) {
+// waitIndexed 等两个存储都把全部 chunk 建好索引。
+//
+// 只等"能查到第一条"是不够的:ES 是近实时索引、Qdrant 写入也异步,语料一大(451 chunk)
+// 评测就会在建索引途中开跑,每次赶上的进度不同 —— 表现为同一配置连续两次运行指标不一致
+// (实测 recall 0.6897 vs 0.7004)。必须等到条目数达到预期,结果才可复现。
+func waitIndexed(ctx context.Context, t *testing.T, setup embedderSetup, keyword *es.KeywordIndex, expected int) {
 	t.Helper()
+	esRefresh(t, setup)
 	filter := vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}}
-	for i := 0; i < 30; i++ {
-		hits, err := keyword.Fetch(ctx, filter, 1)
-		if err == nil && len(hits) > 0 {
+	deadline := time.Now().Add(60 * time.Second)
+	var lastES, lastQdrant int
+	for time.Now().Before(deadline) {
+		hits, err := keyword.Fetch(ctx, filter, expected+10)
+		if err == nil {
+			lastES = len(hits)
+		}
+		lastQdrant = qdrantPointCount(t, setup)
+		if lastES >= expected && lastQdrant >= expected {
 			return
 		}
+		esRefresh(t, setup)
 		time.Sleep(300 * time.Millisecond)
 	}
-	t.Fatal("等待 ES 可检索超时")
+	t.Fatalf("等待索引就绪超时: ES %d/%d, Qdrant %d/%d", lastES, expected, lastQdrant, expected)
+}
+
+// esRefresh 触发 ES 刷新,使刚写入的文档立即可检索。
+func esRefresh(t *testing.T, setup embedderSetup) {
+	t.Helper()
+	resp, err := http.Post(env("ES_URL", "http://localhost:9200")+"/"+setup.collection+"/_refresh", "application/json", nil)
+	if err != nil {
+		return // 刷新失败不致命,轮询会继续等
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+}
+
+// qdrantPointCount 读取 Qdrant collection 当前已入库的点数。
+func qdrantPointCount(t *testing.T, setup embedderSetup) int {
+	t.Helper()
+	resp, err := http.Get(env("QDRANT_HTTP", "http://localhost:6333") + "/collections/" + setup.collection)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	var body struct {
+		Result struct {
+			PointsCount int `json:"points_count"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return 0
+	}
+	return body.Result.PointsCount
 }
 
 func writeJSON(t *testing.T, path string, rep *eval.Report) {

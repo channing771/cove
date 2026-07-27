@@ -165,10 +165,11 @@ bm25-heavy 相对 balanced,**带配对自助 95% 置信区间**:
 
 ### 真实数据评测(-tags ragreal)
 
-不止 fake:`realdata_test.go` 把**仓库自身的 7 篇真实中文技术文档**灌入**真实 Qdrant +
-Elasticsearch**,经生产链路(`ragchunker` 分块 → `ragchunk.Repository` 双写 →
-`ragsearch.Searcher` 混合融合)跑自建数据集 `testdata/datasets/cove-docs.json`(12 条真实
-查询,golden 用可读文件名标注)。
+不止 fake:`realdata_test.go` 把**仓库自身的 26 篇真实中文技术文档**(416KB / 451 chunk)
+灌入**真实 Qdrant + Elasticsearch**,经生产链路(`ragchunker` 分块 → `ragchunk.Repository`
+双写 → `ragsearch.Searcher` 混合融合)跑自建数据集 `testdata/datasets/cove-docs.json`
+(**47 条**真实查询,golden 用可读文件名标注,覆盖网关/MCP/架构/部署/codegen/约定/rerank/
+工具技能等主题,并含多跳、短查询、中英混合、口语化等查询类型)。
 
 ```bash
 docker compose -f deployments/docker-compose.evalstores.yml up -d
@@ -212,18 +213,21 @@ GLM 的 `/embeddings` 与 OpenAI 同构,故直接复用仓库既有的 OpenAI �
 
 #### 实测对比:GLM embedding-3 vs 词形 HashEmbedder
 
-同一冻结语料(7 篇 / 78 chunk)、同一批 12 条 golden 标注查询、同一混合检索链路,top_k=5:
+同一冻结语料(26 篇 / 451 chunk)、同一批 **47 条** golden 标注查询、同一混合检索链路,
+top_k=5,**配对自助 95% 置信区间**(见 `TestRealDataEmbedderComparison`):
 
-| 指标 | hash(词形) | **GLM embedding-3** |
-|---|---|---|
-| recall@5 | 0.9583 | **1.0000** |
-| precision@5 | 0.6389 | **0.8889** |
-| F1 | 0.7167 | **0.9278** |
-| nDCG | 0.9933 | **1.0000** |
-| MAP | 0.9861 | **1.0000** |
-| MRR | 1.0000 | 1.0000 |
+| 指标 | hash(词形) | **GLM embedding-3** | delta | 95%CI | 显著? |
+|---|---|---|---|---|---|
+| recall@5 | 0.7323 | **0.8954** | +0.1631 | [+0.053, +0.277] | ✓ |
+| precision@5 | 0.4504 | **0.6379** | +0.1876 | [+0.098, +0.276] | ✓ |
+| F1 | 0.5211 | **0.7047** | +0.1836 | [+0.104, +0.262] | ✓ |
+| MRR | 0.7057 | **0.8901** | +0.1844 | [+0.089, +0.291] | ✓ |
+| nDCG | 0.6968 | **0.8757** | +0.1789 | [+0.081, +0.277] | ✓ |
+| MAP | 0.6613 | **0.8533** | +0.1919 | [+0.096, +0.294] | ✓ |
+| hit_rate | 0.8085 | **0.9362** | +0.1277 | [+0.021, +0.234] | ✓ |
 
-语义向量在每一项上都不劣于词形,precision/F1 提升尤其明显(+0.25 / +0.21)。
+**7/7 项提升均达到统计显著**——这是可用于决策的结论。对比此前 12 条用例时权重对比
+0/6 显著,说明**数据集规模才是评测能否支撑决策的前提**。
 
 **负例判定(域外问题)—— 语义向量才做得到**:
 

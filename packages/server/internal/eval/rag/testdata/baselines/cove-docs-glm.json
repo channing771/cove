@@ -58,7 +58,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 224,
+      "latency_ms": 238,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -121,7 +121,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 207,
+      "latency_ms": 221,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -184,7 +184,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 244,
+      "latency_ms": 239,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -247,7 +247,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 208,
+      "latency_ms": 162,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -310,7 +310,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 304,
+      "latency_ms": 193,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -394,9 +394,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 1,
+          "value": 0.3333333333333333,
           "passed": true,
-          "detail": "1.0000 (min 0.9500)"
+          "detail": "0.3333 (min 0.3000)"
         },
         {
           "scorer": "hit_rate",
@@ -424,9 +424,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 1,
+          "value": 0.5,
           "passed": true,
-          "detail": "1.0000 (min 0.9500)"
+          "detail": "0.5000 (min 0.4500)"
         },
         {
           "scorer": "low_relevance",
@@ -436,7 +436,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 313,
+      "latency_ms": 207,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -457,9 +457,9 @@
         },
         {
           "scorer": "precision_at_k",
-          "value": 0.5,
+          "value": 0.6666666666666666,
           "passed": true,
-          "detail": "0.5000 (min 0.4500)"
+          "detail": "0.6667 (min 0.6500)"
         },
         {
           "scorer": "hit_rate",
@@ -487,9 +487,9 @@
         },
         {
           "scorer": "f1_at_k",
-          "value": 0.6666666666666666,
+          "value": 0.8,
           "passed": true,
-          "detail": "0.6667 (min 0.6500)"
+          "detail": "0.8000 (min 0.7500)"
         },
         {
           "scorer": "low_relevance",
@@ -499,7 +499,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 188,
+      "latency_ms": 281,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -562,7 +562,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 341,
+      "latency_ms": 207,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -625,7 +625,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 321,
+      "latency_ms": 213,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -688,7 +688,7 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 210,
+      "latency_ms": 288,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -704,15 +704,1781 @@
       "scores": [
         {
           "scorer": "recall_at_k",
+          "value": 0.75,
+          "passed": true,
+          "detail": "0.7500 (min 0.7000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.75,
+          "passed": true,
+          "detail": "0.7500 (min 0.7000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.7536976112592702,
+          "passed": true,
+          "detail": "0.7537 (min 0.7500)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.6041666666666666,
+          "passed": true,
+          "detail": "0.6042 (min 0.6000)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.75,
+          "passed": true,
+          "detail": "0.7500 (min 0.7000)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 171,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gateway-inbound",
+      "tags": [
+        "gateway"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
           "value": 1,
           "passed": true,
           "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 239,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gateway-provider",
+      "tags": [
+        "gateway"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 208,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gateway-contract",
+      "tags": [
+        "gateway"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 241,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-mcp-fallback",
+      "tags": [
+        "mcp"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 194,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-mcp-cache",
+      "tags": [
+        "mcp"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 167,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-mcp-key",
+      "tags": [
+        "mcp"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 178,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-mcp-timeout",
+      "tags": [
+        "mcp"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
           "value": 0.6666666666666666,
           "passed": true,
           "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 157,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-arch-deps",
+      "tags": [
+        "arch"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 167,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-arch-async",
+      "tags": [
+        "arch"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 175,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-arch-stack",
+      "tags": [
+        "arch"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 228,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-deploy-acr",
+      "tags": [
+        "deploy"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 299,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-deploy-release",
+      "tags": [
+        "deploy"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 176,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-codegen-route",
+      "tags": [
+        "codegen"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 178,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-codegen-binding",
+      "tags": [
+        "codegen"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 207,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-codegen-report",
+      "tags": [
+        "codegen"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 214,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-conv-core",
+      "tags": [
+        "convention"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 179,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-conv-option",
+      "tags": [
+        "convention"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 333,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-conv-port",
+      "tags": [
+        "convention"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 293,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-rerank-fail",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 221,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-rerank-pipeline",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 180,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-rerank-window",
+      "tags": [
+        "rag"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 198,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gn-impact",
+      "tags": [
+        "tooling"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 192,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gn-rename",
+      "tags": [
+        "tooling"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.25,
+          "passed": true,
+          "detail": "0.2500 (min 0.2000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.6309297535714574,
+          "passed": true,
+          "detail": "0.6309 (min 0.6000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.4,
+          "passed": true,
+          "detail": "0.4000 (min 0.3500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 244,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gn-cli",
+      "tags": [
+        "tooling"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 220,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-gn-debug",
+      "tags": [
+        "tooling"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.25,
+          "passed": true,
+          "detail": "0.2500 (min 0.2000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.6309297535714574,
+          "passed": true,
+          "detail": "0.6309 (min 0.6000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.4,
+          "passed": true,
+          "detail": "0.4000 (min 0.3500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 180,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-plan-eval-tasks",
+      "tags": [
+        "plan"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 200,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-plan-harness-tdd",
+      "tags": [
+        "plan"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.25,
+          "passed": true,
+          "detail": "0.2500 (min 0.2000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.4,
+          "passed": true,
+          "detail": "0.4000 (min 0.3500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 174,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-multi-rag-eval",
+      "tags": [
+        "rag",
+        "eval",
+        "multihop"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
         },
         {
           "scorer": "hit_rate",
@@ -752,7 +2518,450 @@
           "detail": "skipped: no relevant_ids"
         }
       ],
-      "latency_ms": 310,
+      "latency_ms": 169,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-multi-obs-harness",
+      "tags": [
+        "harness",
+        "observability",
+        "multihop"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.7653606369886218,
+          "passed": true,
+          "detail": "0.7654 (min 0.7500)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.6666666666666666,
+          "passed": true,
+          "detail": "0.6667 (min 0.6500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 280,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-short-rerank",
+      "tags": [
+        "short"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 174,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-short-otel",
+      "tags": [
+        "short"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.6131471927654585,
+          "passed": true,
+          "detail": "0.6131 (min 0.6000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 248,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-short-chunk",
+      "tags": [
+        "short"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.4,
+          "passed": true,
+          "detail": "0.4000 (min 0.3500)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.6509209298071325,
+          "passed": true,
+          "detail": "0.6509 (min 0.6500)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5714285714285715,
+          "passed": true,
+          "detail": "0.5714 (min 0.5500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 158,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-mixed-breaker",
+      "tags": [
+        "mixed"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0,
+          "passed": true,
+          "detail": "0.0000 (min 0.0000)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 201,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-colloquial-deploy",
+      "tags": [
+        "colloquial"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "map",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 275,
+      "iterations": 0,
+      "total_tokens": 0,
+      "cost_usd": 0,
+      "stop_reason": ""
+    },
+    {
+      "case_id": "q-colloquial-eval",
+      "tags": [
+        "colloquial"
+      ],
+      "passed": true,
+      "scores": [
+        {
+          "scorer": "recall_at_k",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "precision_at_k",
+          "value": 0.25,
+          "passed": true,
+          "detail": "0.2500 (min 0.2000)"
+        },
+        {
+          "scorer": "hit_rate",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "mrr",
+          "value": 1,
+          "passed": true,
+          "detail": "1.0000 (min 0.9500)"
+        },
+        {
+          "scorer": "ndcg",
+          "value": 0.6131471927654585,
+          "passed": true,
+          "detail": "0.6131 (min 0.6000)"
+        },
+        {
+          "scorer": "map",
+          "value": 0.5,
+          "passed": true,
+          "detail": "0.5000 (min 0.4500)"
+        },
+        {
+          "scorer": "f1_at_k",
+          "value": 0.3333333333333333,
+          "passed": true,
+          "detail": "0.3333 (min 0.3000)"
+        },
+        {
+          "scorer": "low_relevance",
+          "value": 0,
+          "passed": true,
+          "skipped": true,
+          "detail": "skipped: no relevant_ids"
+        }
+      ],
+      "latency_ms": 183,
       "iterations": 0,
       "total_tokens": 0,
       "cost_usd": 0,
@@ -763,75 +2972,75 @@
   "scorers": {
     "f1_at_k": {
       "scorer": "f1_at_k",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.9277777777777779
+      "mean_value": 0.7047112462006081
     },
     "hit_rate": {
       "scorer": "hit_rate",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 1
+      "mean_value": 0.9361702127659575
     },
     "low_relevance": {
       "scorer": "low_relevance",
-      "runs": 12,
+      "runs": 47,
       "passed": 0,
       "failed": 0,
-      "skipped": 12,
+      "skipped": 47,
       "errored": 0,
       "mean_value": 0
     },
     "map": {
       "scorer": "map",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 1
+      "mean_value": 0.8532801418439716
     },
     "mrr": {
       "scorer": "mrr",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 1
+      "mean_value": 0.8900709219858156
     },
     "ndcg": {
       "scorer": "ndcg",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 1
+      "mean_value": 0.875704958951678
     },
     "precision_at_k": {
       "scorer": "precision_at_k",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 0.8888888888888888
+      "mean_value": 0.6379432624113474
     },
     "recall_at_k": {
       "scorer": "recall_at_k",
-      "runs": 12,
-      "passed": 12,
+      "runs": 47,
+      "passed": 47,
       "failed": 0,
       "skipped": 0,
       "errored": 0,
-      "mean_value": 1
+      "mean_value": 0.8953900709219857
     }
   }
 }

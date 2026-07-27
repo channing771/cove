@@ -37,7 +37,8 @@
       ],
       "expect": {
         "relevant_ids": [
-          "2026-07-26-agent-harness-enterprise-design.md"
+          "2026-07-26-agent-harness-enterprise-design.md",
+          "2026-07-26-agent-harness-enterprise.md"
         ],
         "match_on": "name",
         "k": 5
@@ -45,13 +46,14 @@
     },
     {
       "id": "q-harness-resilience",
-      "query": "模型调用的重试 超时 熔断护栏怎么设计",
+      "query": "Agent 调用大模型时的重试 超时 熔断护栏怎么设计",
       "tags": [
         "harness"
       ],
       "expect": {
         "relevant_ids": [
-          "2026-07-26-agent-harness-enterprise-design.md"
+          "2026-07-26-agent-harness-enterprise-design.md",
+          "2026-07-26-agent-harness-enterprise.md"
         ],
         "match_on": "name",
         "k": 5
@@ -108,7 +110,8 @@
       ],
       "expect": {
         "relevant_ids": [
-          "2026-07-26-vector-store-abstraction-design.md"
+          "2026-07-26-vector-store-abstraction-design.md",
+          "rag-search-README.md"
         ],
         "match_on": "name",
         "k": 5
@@ -137,7 +140,8 @@
       "expect": {
         "relevant_ids": [
           "EVAL.md",
-          "2026-07-26-agent-eval-system-design.md"
+          "2026-07-26-agent-eval-system-design.md",
+          "2026-07-26-agent-eval-system.md"
         ],
         "match_on": "name",
         "k": 5
@@ -152,7 +156,8 @@
       "expect": {
         "relevant_ids": [
           "EVAL.md",
-          "2026-07-26-agent-eval-system-design.md"
+          "2026-07-26-agent-eval-system-design.md",
+          "2026-07-26-agent-eval-system.md"
         ],
         "match_on": "name",
         "k": 5
@@ -168,7 +173,512 @@
       "expect": {
         "relevant_ids": [
           "EVAL.md",
+          "2026-07-26-agent-harness-enterprise-design.md",
+          "2026-07-26-agent-eval-system.md",
+          "2026-07-26-agent-eval-system-design.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gateway-inbound",
+      "query": "多软件接入网关的入站消息是怎么处理的",
+      "tags": [
+        "gateway"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gateway.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gateway-provider",
+      "query": "不同渠道 Provider 的实现差异在哪",
+      "tags": [
+        "gateway"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gateway.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gateway-contract",
+      "query": "渠道契约定义了什么",
+      "tags": [
+        "gateway"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gateway.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-mcp-fallback",
+      "query": "MCP 远端不可用时怎么降级兜底",
+      "tags": [
+        "mcp"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "mcp-tool-flow.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-mcp-cache",
+      "query": "MCP 工具列表的缓存机制",
+      "tags": [
+        "mcp"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "mcp-core-README.md",
+          "mcp-tool-flow.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-mcp-key",
+      "query": "MCP 配置的稳定 key 如何生成",
+      "tags": [
+        "mcp"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "mcp-tool-flow.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-mcp-timeout",
+      "query": "MCP 发现超时与失败冷却怎么控制",
+      "tags": [
+        "mcp"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "mcp-core-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-arch-deps",
+      "query": "项目的依赖方向是怎么规定的",
+      "tags": [
+        "arch"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "architecture.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-arch-async",
+      "query": "异步任务是怎么跑的",
+      "tags": [
+        "arch"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "architecture.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-arch-stack",
+      "query": "后端用了哪些技术栈组件",
+      "tags": [
+        "arch"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "architecture.md",
+          "project-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-deploy-acr",
+      "query": "阿里云 ACR 镜像仓库怎么准备",
+      "tags": [
+        "deploy"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "acr-ghcr-cd-deployment.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-deploy-release",
+      "query": "版本发布规则是什么",
+      "tags": [
+        "deploy"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "acr-ghcr-cd-deployment.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-codegen-route",
+      "query": "路由注解协议怎么写",
+      "tags": [
+        "codegen"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "codegen-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-codegen-binding",
+      "query": "handler 的请求绑定规则",
+      "tags": [
+        "codegen"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "codegen-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-codegen-report",
+      "query": "codegen 的 report 格式是什么",
+      "tags": [
+        "codegen"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "codegen-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-conv-core",
+      "query": "core 包为什么必须是纯抽象库",
+      "tags": [
+        "convention"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "CONVENTIONS.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-conv-option",
+      "query": "core 包里 Option 选项的编写约定",
+      "tags": [
+        "convention"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "CONVENTIONS.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-conv-port",
+      "query": "端口 in-package interface 的约定",
+      "tags": [
+        "convention"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "CONVENTIONS.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-rerank-fail",
+      "query": "重排序失败时会怎么处理",
+      "tags": [
+        "rag"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "rag-search-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-rerank-pipeline",
+      "query": "检索管线分成哪几个阶段",
+      "tags": [
+        "rag"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "rag-search-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-rerank-window",
+      "query": "重排窗口大小怎么配置",
+      "tags": [
+        "rag"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "rag-search-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gn-impact",
+      "query": "怎么评估改动的影响范围 blast radius",
+      "tags": [
+        "tooling"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gitnexus-gitnexus-impact-analysis.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gn-rename",
+      "query": "重命名符号应该用哪个工具",
+      "tags": [
+        "tooling"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gitnexus-gitnexus-refactoring.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gn-cli",
+      "query": "gitnexus 的索引命令怎么用",
+      "tags": [
+        "tooling"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gitnexus-gitnexus-cli.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-gn-debug",
+      "query": "怎么用调用图追踪 bug 的根因",
+      "tags": [
+        "tooling"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "gitnexus-gitnexus-debugging.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-plan-eval-tasks",
+      "query": "评估体系实现计划分成哪些任务",
+      "tags": [
+        "plan"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "2026-07-26-agent-eval-system.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-plan-harness-tdd",
+      "query": "harness 实现计划里的 TDD 步骤",
+      "tags": [
+        "plan"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "2026-07-26-agent-harness-enterprise.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-multi-rag-eval",
+      "query": "RAG 检索用的融合权重,以及怎么评测它的效果",
+      "tags": [
+        "rag",
+        "eval",
+        "multihop"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "2026-07-26-vector-store-abstraction-design.md",
+          "EVAL.md",
+          "rag-search-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-multi-obs-harness",
+      "query": "harness 的可观测埋点最终导到哪个后端",
+      "tags": [
+        "harness",
+        "observability",
+        "multihop"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "2026-07-26-agent-harness-enterprise-design.md",
+          "OBSERVABILITY.md",
+          "2026-07-26-llm-observability-otel-design.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-short-rerank",
+      "query": "rerank",
+      "tags": [
+        "short"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "rag-search-README.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-short-otel",
+      "query": "OTLP",
+      "tags": [
+        "short"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "OBSERVABILITY.md",
+          "2026-07-26-llm-observability-otel-design.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-short-chunk",
+      "query": "文档分块策略",
+      "tags": [
+        "short"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "project-README.md",
+          "architecture.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-mixed-breaker",
+      "query": "circuit breaker 熔断器是怎么实现的",
+      "tags": [
+        "mixed"
+      ],
+      "expect": {
+        "relevant_ids": [
           "2026-07-26-agent-harness-enterprise-design.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-colloquial-deploy",
+      "query": "我想把服务部署上线,要做哪些准备",
+      "tags": [
+        "colloquial"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "acr-ghcr-cd-deployment.md"
+        ],
+        "match_on": "name",
+        "k": 5
+      }
+    },
+    {
+      "id": "q-colloquial-eval",
+      "query": "怎么知道我改的检索有没有变差",
+      "tags": [
+        "colloquial"
+      ],
+      "expect": {
+        "relevant_ids": [
+          "EVAL.md",
+          "2026-07-26-agent-eval-system.md"
         ],
         "match_on": "name",
         "k": 5
