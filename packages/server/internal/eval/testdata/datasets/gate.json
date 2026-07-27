@@ -1,0 +1,16 @@
+{
+  "name": "gate",
+  "cases": [
+    {
+      "id": "final-answer",
+      "query": "回答:42",
+      "expect": {
+        "contains": ["42"],
+        "stop_reason": "final_answer",
+        "max_iterations": 2,
+        "latency_ms": 60000,
+        "token_budget": 1000
+      }
+    }
+  ]
+}

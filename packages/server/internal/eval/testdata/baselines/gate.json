@@ -1,0 +1,18 @@
+{
+  "dataset": "gate",
+  "pass_rate": 1,
+  "cases": [
+    {
+      "case_id": "final-answer",
+      "passed": true,
+      "scores": [
+        {"scorer": "contains", "passed": true, "value": 1},
+        {"scorer": "stop_reason", "passed": true, "value": 1},
+        {"scorer": "max_iterations", "passed": true, "value": 1},
+        {"scorer": "latency_budget", "passed": true, "value": 1},
+        {"scorer": "token_budget", "passed": true, "value": 1}
+      ]
+    }
+  ],
+  "scorers": {}
+}
