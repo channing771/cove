@@ -494,9 +494,21 @@ func TestRealDataWeightComparison(t *testing.T) {
 	for _, scorer := range []string{"ndcg", "map", "mrr", "f1_at_k"} {
 		t.Logf("最佳配置 by %-8s = %s", scorer, cmp.Best(scorer))
 	}
-	for _, d := range cmp.Delta("balanced-0.6/0.4", "bm25-heavy-0.1/0.9") {
-		t.Logf("bm25-heavy 相对 balanced:%-14s %+.4f (%.4f → %.4f)", d.Scorer, d.Delta, d.Base, d.Candidate)
+
+	// 均值差必须配上置信区间才可解读:当前数据集只有十余条用例,一条用例的排名变化
+	// 就能让均值波动数个百分点。只有标"显著"(区间不跨 0)的差异才足以支撑调参决策。
+	t.Log("bm25-heavy 相对 balanced(配对自助 95% 置信区间):")
+	sig := 0
+	for _, d := range cmp.DeltaWithCI("balanced-0.6/0.4", "bm25-heavy-0.1/0.9", 0.95, 2000, 1) {
+		mark := "不显著(与噪声无法区分)"
+		if d.Significant {
+			mark = "显著"
+			sig++
+		}
+		t.Logf("  %-16s %.4f → %.4f  delta=%+.4f  95%%CI=[%+.6f, %+.6f]  %s",
+			d.Scorer, d.Base, d.Candidate, d.Delta, d.CI.Lo, d.CI.Hi, mark)
 	}
+	t.Logf("共 %d/%d 项指标差异在 %d 条用例下达到统计显著", sig, len(cmp.Variants[0].Report.Scorers), len(ds.Cases))
 
 	if len(cmp.Variants) != 3 {
 		t.Fatalf("variants = %d, want 3", len(cmp.Variants))
