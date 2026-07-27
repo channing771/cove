@@ -103,6 +103,42 @@ func Aggregate(dataset string, cases []CaseResult) *Report {
 	return rep
 }
 
+// TagAgg 是某个标签下的用例聚合。
+type TagAgg struct {
+	Tag      string  `json:"tag"`
+	Cases    int     `json:"cases"`
+	Passed   int     `json:"passed"`
+	PassRate float64 `json:"pass_rate"`
+}
+
+// ByTag 按用例标签聚合通过情况,用于定位哪一类查询表现差。
+//
+// 一条用例带多个标签时会计入每个标签;无标签的用例不产生分组。
+func (r *Report) ByTag() map[string]TagAgg {
+	out := map[string]TagAgg{}
+	for _, c := range r.Cases {
+		for _, tag := range c.Tags {
+			if tag == "" {
+				continue
+			}
+			agg := out[tag]
+			agg.Tag = tag
+			agg.Cases++
+			if c.Passed {
+				agg.Passed++
+			}
+			out[tag] = agg
+		}
+	}
+	for tag, agg := range out {
+		if agg.Cases > 0 {
+			agg.PassRate = float64(agg.Passed) / float64(agg.Cases)
+			out[tag] = agg
+		}
+	}
+	return out
+}
+
 // WriteJSON 以缩进 JSON 写出报告。
 func (r *Report) WriteJSON(w io.Writer) error {
 	enc := json.NewEncoder(w)

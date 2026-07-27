@@ -21,10 +21,19 @@ type SearcherRetriever struct {
 	Searcher *ragsearch.Searcher[models.RAGChunkSource]
 	Embedder ragsearch.Embedder
 	Filter   vectorstore.Filter
+	// Options 是附加的请求级检索选项(如 WithInputRerankEnabled、WithMinVectorScore、
+	// WithInputLowRelevanceThreshold),便于用同一语料对比不同检索配置。
+	Options []ragsearch.InputOption
 }
 
 // Retrieve 调 Searcher.Search 并把每条 Output 映射为评测视图 RetrievedHit。
 func (s SearcherRetriever) Retrieve(ctx context.Context, query string, topK int) ([]rag.RetrievedHit, error) {
+	hits, _, err := s.RetrieveWithRelevance(ctx, query, topK)
+	return hits, err
+}
+
+// RetrieveWithRelevance 额外返回生产的整体低相关判定,供负例用例打分。
+func (s SearcherRetriever) RetrieveWithRelevance(ctx context.Context, query string, topK int) ([]rag.RetrievedHit, rag.Relevance, error) {
 	opts := []ragsearch.InputOption{
 		ragsearch.WithTopK(topK),
 		ragsearch.WithFilters(s.Filter),
@@ -32,9 +41,11 @@ func (s SearcherRetriever) Retrieve(ctx context.Context, query string, topK int)
 	if s.Embedder != nil {
 		opts = append(opts, ragsearch.WithInputEmbedder(s.Embedder))
 	}
+	opts = append(opts, s.Options...)
+
 	res, err := s.Searcher.Search(ctx, query, opts...)
 	if err != nil {
-		return nil, err
+		return nil, rag.Relevance{}, err
 	}
 	hits := make([]rag.RetrievedHit, 0, len(res.Results))
 	for _, o := range res.Results {
@@ -47,7 +58,16 @@ func (s SearcherRetriever) Retrieve(ctx context.Context, query string, topK int)
 			RerankScore: o.RerankScore,
 		})
 	}
-	return hits, nil
+	relevance := rag.Relevance{
+		Low:       res.Relevance.Low,
+		Basis:     string(res.Relevance.Basis),
+		MaxScore:  res.Relevance.MaxScore,
+		Threshold: res.Relevance.Threshold,
+	}
+	return hits, relevance, nil
 }
 
-var _ rag.Retriever = SearcherRetriever{}
+var (
+	_ rag.Retriever               = SearcherRetriever{}
+	_ rag.RelevanceAwareRetriever = SearcherRetriever{}
+)

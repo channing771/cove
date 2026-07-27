@@ -94,58 +94,9 @@ rep, _ := e.Run(ctx, ds)           // 产出的是同一个 eval.Report,可 Diff
 | `k` | 截断的 top-k(覆盖 runner 的 TopK) |
 | `recall_min`/`precision_min`/`hit_min`/`mrr_min`/`ndcg_min` | 各指标通过阈值(缺省 0=只记录不 gate) |
 
-**指标**(确定性、无 LLM,均归一化到 0..1):
-
-| 打分器 | 含义 | 阈值键 |
-|---|---|---|
-| `RecallAtK` | 召回的 golden 占比 | `recall_min` |
-| `PrecisionAtK` | 检索结果中相关的占比(分母为**检索到的不同文档数**,适配可变长结果) | `precision_min` |
-| `HitRate` | 前 k 是否至少命中一个 golden | `hit_min` |
-| `MRR` | 首个相关命中的倒数排名 | `mrr_min` |
-| `NDCG` | 二值相关度的归一化折损累计增益 | `ndcg_min` |
-| `MAP` | 各相关命中位置 P@k 的平均——对"多个相关文档是否都靠前"敏感 | `map_min` |
-| `F1AtK` | Precision/Recall 的调和平均,适合做总体门禁 | `f1_min` |
-
-**要让回归门禁抓到检索质量跌落**,数据集需为关键用例设 `*_min` 阈值——指标跌破阈值即
-pass→fail,`Diff` 才捕获。阈值应取**实测绿色运行的保守下界**,而非拍脑袋。
-
-**负例(库里没有答案的问题)**:`LowRelevanceIs`(`expect_low_relevance`)断言生产的低相关
-判定;`NoResults`(`expect_no_results`)断言检索为空(如越权/越库必须查不到)。
-
-### 检索配置对比(RAG 调参)
-
-评测的主用途之一是回答"向量权重调高有没有提升""开重排值不值""top_k 取多少"。`Comparer`
-在**同一数据集、同一组打分器**下横向跑多个配置:
-
-```go
-cmp, _ := (&rag.Comparer{
-    Variants: []rag.Variant{
-        {Name: "balanced", Runner: runnerWith(0.6, 0.4)},
-        {Name: "bm25-heavy", Runner: runnerWith(0.1, 0.9)},
-    },
-    Scorers: []rag.Scorer{rag.RecallAtK(), rag.PrecisionAtK(), rag.MRR(), rag.NDCG(), rag.MAP(), rag.F1AtK()},
-}).Run(ctx, ds)
-
-cmp.WriteTable(os.Stdout)             // 配置 × 指标 对比表
-cmp.Best("ndcg")                      // 该指标下最优配置名
-cmp.Delta("balanced", "bm25-heavy")   // 逐指标均值差(正=候选更好)
-```
-
-真实语料实测(见 `TestRealDataWeightComparison`),bm25-heavy 相对 balanced:
-
-| 指标 | 变化 |
-|---|---|
-| precision@5 | **+0.0972**(0.6389 → 0.7361) |
-| f1 | **+0.0611**(0.7444 → 0.8056) |
-| recall@5 | −0.0417(1.0000 → 0.9583) |
-| nDCG | −0.0255(0.9933 → 0.9678) |
-| MAP | −0.0278(0.9861 → 0.9583) |
-
-即:提高 BM25 权重更准但更漏,排序质量略降——经典 precision/recall 权衡被量化,而非凭感觉。
-
-### 按标签分组
-
-数据集用例的 `tags` 可用 `report.ByTag()` 聚合,定位哪一类查询弱(一条用例多标签会计入每个标签)。
+**指标**(确定性、无 LLM,均归一化到 0..1):`RecallAtK`、`PrecisionAtK`、`HitRate@k`、
+`MRR`(首个相关命中的倒数排名)、`NDCG@k`(二值相关度归一化折损累计增益)。**要让回归门禁
+抓到检索质量跌落**,数据集需为关键用例设 `*_min` 阈值——指标跌破阈值即 pass→fail,`Diff` 才捕获。
 
 **门禁**:`go test ./internal/eval/rag/ -tags eval -run TestRAGGate -v`(参考 `rag_gate_test.go`)。
 
@@ -174,16 +125,6 @@ MRR **1.000**、nDCG **0.9866**、precision\@5 **0.5972**,pass\_rate 100%。阈�
 **嵌入**:默认用 `corpus.HashEmbedder`(字符 bigram 特征哈希 + L2 归一化)—— 无需 API key、
 完全可复现,配合 ES 的真实 BM25 通道即可产出有意义的混合排序;要评测真实模型的语义检索,
 把真实 `llm.Client` 注入 `Ingester.Embedder` 与 `SearcherRetriever.Embedder` 即可替换。
-
-**语料必须冻结**:语料是 `testdata/corpus/` 下的**快照**,不是直接读活文档。因为语料里含
-`docs/EVAL.md`,而记录这套评测本身就会改它——活文档一变,chunk 与检索结果随之变化,基线
-悄悄失效(实测 nDCG 0.9866→0.9933)。更新语料时须同步刷新快照与基线。
-
-**负例的已知局限(未纳入门禁)**:`testdata/datasets/cove-docs-negatives.json` 存放 3 条域外
-问题。实测其最高向量分(0.2306–0.2464)**落在域内问题区间内**(0.2094–0.4503),`neg-cooking`
-的 0.2464 甚至高于 `q-langfuse-quickstart` 的 0.2094 —— **不存在能分开二者的阈值**。这是词形
-`HashEmbedder` 的固有局限(中文字符 bigram 在任意文本间都有相似度地板),换真实语义嵌入模型
-后分离度才会拉开。`LowRelevanceIs`/`NoResults` 打分器本身已单测覆盖,可随时启用。
 
 **两个真实数据才暴露的问题(已修)**:
 1. **nDCG 溢出 (0,1]**:doc 级匹配下同一文档有多个 chunk 命中,逐 chunk 计入会让 DCG 重复

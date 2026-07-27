@@ -29,8 +29,18 @@ func (r *RetrievalRunner) Run(ctx context.Context, c eval.Case) (RetrievalRecord
 	if v, ok := eval.ExpectInt(c, "k"); ok && v > 0 {
 		k = v
 	}
+	// 检索器若实现 RelevanceAwareRetriever,顺带取回生产的低相关判定供负例打分。
 	start := time.Now()
-	hits, err := r.Retriever.Retrieve(ctx, c.Query, k)
+	var (
+		hits      []RetrievedHit
+		relevance Relevance
+		err       error
+	)
+	if aware, ok := r.Retriever.(RelevanceAwareRetriever); ok {
+		hits, relevance, err = aware.RetrieveWithRelevance(ctx, c.Query, k)
+	} else {
+		hits, err = r.Retriever.Retrieve(ctx, c.Query, k)
+	}
 	latency := time.Since(start)
-	return RetrievalRecord{Hits: hits, RequestedK: k, Latency: latency, Err: err}, nil
+	return RetrievalRecord{Hits: hits, RequestedK: k, Latency: latency, Relevance: relevance, Err: err}, nil
 }

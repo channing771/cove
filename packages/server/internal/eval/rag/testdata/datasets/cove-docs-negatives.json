@@ -1,0 +1,38 @@
+{
+  "name": "cove-docs-negatives",
+  "cases": [
+    {
+      "id": "neg-cooking",
+      "query": "红烧肉的家常做法和火候技巧",
+      "tags": [
+        "negative"
+      ],
+      "expect": {
+        "expect_low_relevance": true,
+        "k": 5
+      }
+    },
+    {
+      "id": "neg-visa",
+      "query": "日本旅游签证需要准备哪些材料",
+      "tags": [
+        "negative"
+      ],
+      "expect": {
+        "expect_low_relevance": true,
+        "k": 5
+      }
+    },
+    {
+      "id": "neg-sports",
+      "query": "世界杯决赛的最终比分是多少",
+      "tags": [
+        "negative"
+      ],
+      "expect": {
+        "expect_low_relevance": true,
+        "k": 5
+      }
+    }
+  ]
+}

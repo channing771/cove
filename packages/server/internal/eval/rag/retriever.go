@@ -30,6 +30,17 @@ func (h RetrievedHit) identity(matchOn string) string {
 	}
 }
 
+// Relevance 是生产检索的整体低相关判定(ragsearch.RelevanceStatus 的评测视图)。
+//
+// Low 表示本次检索最高分低于阈值——业务层据此决定是否使用这些结果。评测用它覆盖负例:
+// 知识库里没有答案的问题,检索器仍会返回"最像"的若干块,但必须被标记为低相关。
+type Relevance struct {
+	Low       bool     `json:"low"`
+	Basis     string   `json:"basis,omitempty"` // vector | rerank | 空
+	MaxScore  *float64 `json:"max_score,omitempty"`
+	Threshold *float64 `json:"threshold,omitempty"`
+}
+
 // Retriever 是 RAG 检索的被测接口(SUT)。
 //
 // 生产实现由子包 ragadapter 包装 ragsearch.Searcher;单测用 fake。返回结果应按相关性
@@ -38,12 +49,23 @@ type Retriever interface {
 	Retrieve(ctx context.Context, query string, topK int) ([]RetrievedHit, error)
 }
 
+// RelevanceAwareRetriever 是可选接口:除命中外额外报告低相关判定。
+//
+// RetrievalRunner 会自动探测该接口;未实现时 RetrievalRecord.Relevance 为零值,
+// 相关打分器(LowRelevanceIs)对该用例的判定将失败而非静默通过——故负例数据集应搭配
+// 实现了本接口的检索器(如 ragadapter.SearcherRetriever)。
+type RelevanceAwareRetriever interface {
+	Retriever
+	RetrieveWithRelevance(ctx context.Context, query string, topK int) ([]RetrievedHit, Relevance, error)
+}
+
 // RetrievalRecord 表示一次检索的产物。
 type RetrievalRecord struct {
-	Hits        []RetrievedHit
-	RequestedK  int
-	Latency     time.Duration
-	Err         error
+	Hits       []RetrievedHit
+	RequestedK int
+	Latency    time.Duration
+	Relevance  Relevance
+	Err        error
 }
 
 // topKHits 返回前 k 条命中;k<=0 表示全部。

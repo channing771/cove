@@ -4,181 +4,257 @@
     {
       "id": "q-react-dual-path",
       "query": "ReAct agent 的双路径决策流程是怎样的",
-      "tags": ["agent"],
+      "tags": [
+        "agent"
+      ],
       "expect": {
-        "relevant_ids": ["README.md"],
+        "relevant_ids": [
+          "README.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.3
+        "precision_min": 0.3,
+        "map_min": 0.95,
+        "f1_min": 0.45
       }
     },
     {
       "id": "q-agent-phase",
       "query": "Agent 运行状态机有哪些阶段 Phase",
-      "tags": ["agent"],
+      "tags": [
+        "agent"
+      ],
       "expect": {
-        "relevant_ids": ["README.md"],
+        "relevant_ids": [
+          "README.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.3
+        "precision_min": 0.3,
+        "map_min": 0.95,
+        "f1_min": 0.45
       }
     },
     {
       "id": "q-harness-pillars",
       "query": "企业级 harness 的四支柱包括哪些",
-      "tags": ["harness"],
+      "tags": [
+        "harness"
+      ],
       "expect": {
-        "relevant_ids": ["2026-07-26-agent-harness-enterprise-design.md"],
+        "relevant_ids": [
+          "2026-07-26-agent-harness-enterprise-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.3
+        "precision_min": 0.3,
+        "map_min": 0.95,
+        "f1_min": 0.45
       }
     },
     {
       "id": "q-harness-resilience",
       "query": "模型调用的重试 超时 熔断护栏怎么设计",
-      "tags": ["harness"],
+      "tags": [
+        "harness"
+      ],
       "expect": {
-        "relevant_ids": ["2026-07-26-agent-harness-enterprise-design.md"],
+        "relevant_ids": [
+          "2026-07-26-agent-harness-enterprise-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.95
+        "precision_min": 0.95,
+        "map_min": 0.95,
+        "f1_min": 0.95
       }
     },
     {
       "id": "q-langfuse-quickstart",
       "query": "怎么在本地起 Langfuse 看 trace",
-      "tags": ["observability"],
+      "tags": [
+        "observability"
+      ],
       "expect": {
-        "relevant_ids": ["OBSERVABILITY.md", "2026-07-26-llm-observability-otel-design.md"],
+        "relevant_ids": [
+          "OBSERVABILITY.md",
+          "2026-07-26-llm-observability-otel-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.9,
-        "precision_min": 0.6
+        "precision_min": 0.6,
+        "map_min": 0.95,
+        "f1_min": 0.75
       }
     },
     {
       "id": "q-otel-config",
       "query": "OTLP endpoint 采样率 环境变量配置项",
-      "tags": ["observability"],
+      "tags": [
+        "observability"
+      ],
       "expect": {
-        "relevant_ids": ["OBSERVABILITY.md"],
+        "relevant_ids": [
+          "OBSERVABILITY.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.3
+        "precision_min": 0.3,
+        "map_min": 0.95,
+        "f1_min": 0.65
       }
     },
     {
       "id": "q-vectorstore-ports",
       "query": "向量存储抽象定义了哪两个端口",
-      "tags": ["rag"],
+      "tags": [
+        "rag"
+      ],
       "expect": {
-        "relevant_ids": ["2026-07-26-vector-store-abstraction-design.md"],
+        "relevant_ids": [
+          "2026-07-26-vector-store-abstraction-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.45
+        "precision_min": 0.45,
+        "map_min": 0.95,
+        "f1_min": 0.65
       }
     },
     {
       "id": "q-hybrid-fusion",
       "query": "稠密向量和 BM25 分数如何归一化融合",
-      "tags": ["rag"],
+      "tags": [
+        "rag"
+      ],
       "expect": {
-        "relevant_ids": ["2026-07-26-vector-store-abstraction-design.md"],
+        "relevant_ids": [
+          "2026-07-26-vector-store-abstraction-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.3
+        "precision_min": 0.3,
+        "map_min": 0.95,
+        "f1_min": 0.45
       }
     },
     {
       "id": "q-rag-metrics",
       "query": "RAG 检索评测有哪些指标 召回率 MRR",
-      "tags": ["eval"],
+      "tags": [
+        "eval"
+      ],
       "expect": {
-        "relevant_ids": ["EVAL.md"],
+        "relevant_ids": [
+          "EVAL.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.45
+        "precision_min": 0.45,
+        "map_min": 0.95,
+        "f1_min": 0.95
       }
     },
     {
       "id": "q-expect-keys",
       "query": "评测用例 expect 字段支持哪些键",
-      "tags": ["eval"],
+      "tags": [
+        "eval"
+      ],
       "expect": {
-        "relevant_ids": ["EVAL.md"],
+        "relevant_ids": [
+          "EVAL.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.95
+        "precision_min": 0.95,
+        "map_min": 0.95,
+        "f1_min": 0.95
       }
     },
     {
       "id": "q-eval-layers",
       "query": "评估体系的四层架构 数据集 运行器 打分器 报告",
-      "tags": ["eval"],
+      "tags": [
+        "eval"
+      ],
       "expect": {
-        "relevant_ids": ["EVAL.md", "2026-07-26-agent-eval-system-design.md"],
+        "relevant_ids": [
+          "EVAL.md",
+          "2026-07-26-agent-eval-system-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.95,
-        "precision_min": 0.95
+        "precision_min": 0.95,
+        "map_min": 0.95,
+        "f1_min": 0.95
       }
     },
     {
       "id": "q-cassette",
       "query": "如何录制磁带 cassette 做可复现回放",
-      "tags": ["eval", "harness"],
+      "tags": [
+        "eval",
+        "harness"
+      ],
       "expect": {
-        "relevant_ids": ["EVAL.md", "2026-07-26-agent-harness-enterprise-design.md"],
+        "relevant_ids": [
+          "EVAL.md",
+          "2026-07-26-agent-harness-enterprise-design.md"
+        ],
         "match_on": "name",
         "k": 5,
         "recall_min": 1.0,
         "hit_min": 1.0,
         "mrr_min": 1.0,
         "ndcg_min": 0.9,
-        "precision_min": 0.6
+        "precision_min": 0.6,
+        "map_min": 0.8,
+        "f1_min": 0.75
       }
     }
   ]
