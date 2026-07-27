@@ -17,24 +17,33 @@ Agent Harness 的 `observabilityHooks` 对每次运行产出：
 > 注：生产聊天走流式路径，token/成本用量当前不进 span（`gen_ai.usage.*` 待后续在非流式或
 > stream-usage 增强补齐）。工具调用数、墙钟、时延、停止原因等护栏与信号均已覆盖。
 
-## 快速开始（本地 Langfuse）
+## 快速开始（本地 Langfuse，开箱即用）
+
+compose 已做 **headless 初始化**（自动建 org/project/账号 + 固定 demo 密钥）与 **MinIO bucket 自动创建**，无需进 UI 手动配置。
 
 ```bash
-# 1. 起 Langfuse 栈
+# 1. 起 Langfuse 栈（首次会拉镜像 + 迁移 ClickHouse，约 1-3 分钟）
 docker compose -f deployments/docker-compose.observability.yml up -d
+# 等 http://localhost:3000/api/public/health 返回 200
 
-# 2. 打开 http://localhost:3000 注册 → 建 project → 复制 public/secret key
-#    若事件不落库，去 MinIO 控制台 http://localhost:9090 (minio/miniosecret) 建名为 langfuse 的 bucket
-
-# 3. 计算 Basic auth 并配置 API 环境
-AUTH=$(echo -n "pk-lf-xxxx:sk-lf-xxxx" | base64)
+# 2. 用内置 demo 密钥计算 Basic auth（UI 登录：dev@cove.local / covedevpassword）
+AUTH=$(printf 'pk-lf-cove-local-0000000000000000:sk-lf-cove-local-0000000000000000' | base64)
 export OTEL_ENABLED=true
 export OTEL_TRACES_ENDPOINT=http://localhost:3000/api/public/otel/v1/traces
 export OTEL_TRACES_HEADERS="Authorization=Basic ${AUTH}"
+export OTEL_INSECURE=true
 
-# 4. 启动 API 并发起一次 chat，回到 Langfuse 的 Tracing 看 run → model/tool trace
+# 3a. 冒烟验证（不启整套 API）：直接导一次真实 gen_ai span 到 Langfuse
+go test ./internal/observability/otel/ -tags manual -run TestExportToLangfuse -v
+#     然后 GET /api/public/traces 应看到一条 gen_ai.agent.run trace（含 gen_ai.chat 子 span）
+
+# 3b. 或启动完整 API 并发起一次 chat，在 Langfuse 的 Tracing 看 run → model/tool trace
 make api
 ```
+
+> 已验证：clean `up -d` → bucket 自动创建 → web 健康 → OTLP 导出 → Langfuse 出现
+> `gen_ai.agent.run`（含 `gen_ai.chat`）trace，属性 `gen_ai.agent.name=cove`、
+> `gen_ai.response.stop_reason`、`gen_ai.agent.iterations`，全程零手动步骤。
 
 ## 配置项
 

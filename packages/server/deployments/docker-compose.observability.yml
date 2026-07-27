@@ -22,6 +22,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     ports:
@@ -31,7 +33,18 @@ services:
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: dev-nextauth-secret-change-me
       SALT: dev-salt-change-me
-      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      ENCRYPTION_KEY: a2c40f472fa1b1c242bc856c94bbabed2201eaec708c843a2a5eceebb79ec896
+      # Headless 初始化：开箱即用的 org/project/账号与固定 demo 密钥（仅本地）。
+      # 直接用下面的 pk/sk 计算 OTEL_TRACES_HEADERS，无需进 UI 建 project。
+      LANGFUSE_INIT_ORG_ID: cove-local
+      LANGFUSE_INIT_ORG_NAME: Cove Local
+      LANGFUSE_INIT_PROJECT_ID: cove-local
+      LANGFUSE_INIT_PROJECT_NAME: Cove
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-cove-local-0000000000000000
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-cove-local-0000000000000000
+      LANGFUSE_INIT_USER_EMAIL: dev@cove.local
+      LANGFUSE_INIT_USER_NAME: Cove Dev
+      LANGFUSE_INIT_USER_PASSWORD: covedevpassword
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: clickhouse
@@ -57,6 +70,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment: *langfuse-env
@@ -87,6 +102,8 @@ services:
       retries: 10
     volumes:
       - langfuse_clickhouse:/var/lib/clickhouse
+      # 单节点内嵌 Keeper 配置，支撑 Langfuse 的 ReplicatedMergeTree(ON CLUSTER default)。
+      - ./clickhouse/config.d/keeper.xml:/etc/clickhouse-server/config.d/keeper.xml:ro
 
   minio:
     image: docker.io/minio/minio:latest
@@ -103,6 +120,18 @@ services:
       retries: 10
     volumes:
       - langfuse_minio:/data
+
+  # 一次性初始化：创建 Langfuse 事件所需的 bucket（否则 OTLP 摄取会 NoSuchBucket → 500）。
+  minio-setup:
+    image: docker.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "mc alias set local http://minio:9000 minio miniosecret && mc mb -p local/langfuse && echo 'langfuse bucket ready'"
+    restart: "no"
 
   redis:
     image: docker.io/redis:7
