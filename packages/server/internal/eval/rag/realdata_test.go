@@ -744,3 +744,90 @@ func writeJSON(t *testing.T, path string, rep *eval.Report) {
 type logWriter struct{ t *testing.T }
 
 func (w logWriter) Write(p []byte) (int, error) { w.t.Log(string(p)); return len(p), nil }
+
+// TestRealDataGenerationEval 端到端评测 RAG 的**生成层**:真实检索 → GLM 生成答案 →
+// GLM 评审忠实度/切题度。
+//
+// 这补上了此前的空白:检索指标只能证明"找对了资料",证明不了"答得对、没幻觉"。
+// 需要 GLM key(生成与评审都要调模型);未配置时跳过。
+//
+//	GLM_API_KEY=... go test ./internal/eval/rag/ -tags ragreal -run TestRealDataGenerationEval -v
+func TestRealDataGenerationEval(t *testing.T) {
+	ctx := context.Background()
+	apiKey := env("GLM_API_KEY", os.Getenv("ZHIPU_API_KEY"))
+	if apiKey == "" {
+		t.Skip("未配置 GLM key,跳过生成层评测")
+	}
+	dense, keyword, setup := setupRealStores(ctx, t)
+
+	chat, err := corpus.NewGLMChatClient(apiKey, env("GLM_CHAT_MODEL", corpus.GLMChatModel), os.Getenv("GLM_BASE_URL"))
+	if err != nil {
+		t.Fatalf("构造 GLM 对话客户端: %v", err)
+	}
+	repo := ragchunk.NewRepository(dense, keyword)
+	searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
+		ragsearch.WithEmbeddingDim(setup.dim),
+		ragsearch.WithEmbedder(setup.embedder),
+		ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
+	retriever := ragadapter.SearcherRetriever{
+		Searcher: searcher, Embedder: setup.embedder,
+		Filter: vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}},
+	}
+
+	ds, err := eval.LoadDataset("testdata/datasets/cove-generation.json")
+	if err != nil {
+		t.Fatalf("load dataset: %v", err)
+	}
+	judge := rag.GenJudge{Client: chat, PassThreshold: 0.6}
+	e := &rag.GenEvaluator{
+		Runner: &rag.GenerationRunner{
+			Retriever: retriever, Generator: rag.LLMGenerator{Client: chat}, TopK: 5, MaxContexts: 3,
+		},
+		Scorers: []rag.GenScorer{
+			rag.AnswerContains(),
+			rag.Faithfulness(judge),
+			rag.AnswerRelevance(judge),
+			rag.AnswerCorrectness(judge),
+		},
+	}
+	rep, err := e.Run(ctx, ds)
+	if err != nil {
+		t.Fatalf("generation eval: %v", err)
+	}
+
+	for _, c := range rep.Cases {
+		t.Logf("[%s] 答案: %s", c.CaseID, truncateForLog(c.Answer, 120))
+		for _, s := range c.Scores {
+			if s.Skipped {
+				continue
+			}
+			status := "PASS"
+			if !s.Passed {
+				status = "FAIL"
+			}
+			t.Logf("    %-20s %s value=%.2f  %s", s.Scorer, status, s.Value, truncateForLog(s.Detail, 90))
+		}
+	}
+	for name, agg := range rep.Scorers {
+		t.Logf("scorer %-20s mean=%.4f pass=%d fail=%d skip=%d", name, agg.MeanValue, agg.Passed, agg.Failed, agg.Skipped)
+	}
+	t.Logf("生成层 pass_rate = %.2f%%", rep.PassRate*100)
+
+	// 忠实度是 RAG 生成层的底线:允许个别答案不完美,但幻觉必须极少。
+	if agg, ok := rep.Scorers["faithfulness"]; ok && agg.Runs > 0 {
+		rate := float64(agg.Passed) / float64(agg.Runs)
+		t.Logf("faithfulness 通过率 = %.2f%% (%d/%d)", rate*100, agg.Passed, agg.Runs)
+		if rate < 0.8 {
+			t.Errorf("忠实度通过率 %.2f%% 低于 80%% 门槛,存在幻觉风险", rate*100)
+		}
+	}
+}
+
+func truncateForLog(s string, n int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
+}

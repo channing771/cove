@@ -105,3 +105,27 @@ func (e *ClientEmbedder) EmbedOne(ctx context.Context, text string, dimensions i
 	}
 	return e.client.EmbedOne(ctx, text, e.resolveDim(dimensions))
 }
+
+// GLMChatModel 是 GLM 的默认对话模型(便宜、够用,适合评测里的生成与评审)。
+const GLMChatModel = "glm-4-flash"
+
+// NewGLMChatClient 构造 GLM 对话客户端,供 RAG 生成与 LLM 评审使用。
+//
+// 与嵌入同走 OpenAI 兼容接口;model 为空时用 GLMChatModel,baseURL 为空时用 GLMBaseURL。
+func NewGLMChatClient(apiKey, model, baseURL string) (corellm.Client, error) {
+	if apiKey == "" {
+		return nil, errors.New("corpus: GLM API key 为空")
+	}
+	if model == "" {
+		model = GLMChatModel
+	}
+	if baseURL == "" {
+		baseURL = GLMBaseURL
+	}
+	return infrallm.NewOpenAICompatibleFactory().NewClient(corellm.ModelConfig{
+		Provider: "zhipu",
+		Model:    model,
+		APIKey:   apiKey,
+		BaseURL:  baseURL,
+	})
+}

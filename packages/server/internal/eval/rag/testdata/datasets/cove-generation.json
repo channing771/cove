@@ -1,0 +1,99 @@
+{
+  "name": "cove-generation",
+  "cases": [
+    {
+      "id": "gen-vectorstore-ports",
+      "query": "向量存储抽象定义了哪两个端口,各自负责什么",
+      "tags": ["rag"],
+      "expect": {
+        "k": 5,
+        "reference": "两个端口是 DenseIndex 和 KeywordIndex。DenseIndex 由 Qdrant 实现,负责稠密向量的存储与相似度检索;KeywordIndex 由 Elasticsearch 实现,负责关键词 BM25 检索。",
+        "answer_contains": ["DenseIndex", "KeywordIndex"]
+      }
+    },
+    {
+      "id": "gen-rerank-failopen",
+      "query": "重排服务报错时检索会怎么处理",
+      "tags": ["rag"],
+      "expect": {
+        "k": 5,
+        "reference": "默认 failOpen=true,即重排失败时回退到第一阶段的融合排序结果,不向上返回错误,检索仍可用。"
+      }
+    },
+    {
+      "id": "gen-otel-env",
+      "query": "配置 OTLP 导出的环境变量叫什么",
+      "tags": ["observability"],
+      "expect": {
+        "k": 5,
+        "reference": "traces 端点用 OTEL_TRACES_ENDPOINT,采样率用 OTEL_SAMPLE_RATIO,总开关是 OTEL_ENABLED。",
+        "answer_contains": ["OTEL_TRACES_ENDPOINT"]
+      }
+    },
+    {
+      "id": "gen-harness-pillars",
+      "query": "企业级 harness 的四支柱分别是什么",
+      "tags": ["harness"],
+      "expect": {
+        "k": 5,
+        "reference": "四支柱是可靠性(Resilience)、治理(Governance)、可观测(Observability)、确定性(Determinism)。"
+      }
+    },
+    {
+      "id": "gen-langfuse-start",
+      "query": "本地怎么把 trace 发到 Langfuse",
+      "tags": ["observability"],
+      "expect": {
+        "k": 5,
+        "reference": "用 docker compose 起 Langfuse 栈,然后设置 OTEL_ENABLED=true、OTEL_TRACES_ENDPOINT 指向 Langfuse 的 /api/public/otel/v1/traces,并用 public/secret key 组成 Basic auth 放进 OTEL_TRACES_HEADERS。"
+      }
+    },
+    {
+      "id": "gen-search-pipeline",
+      "query": "混合检索的流水线包含哪些步骤",
+      "tags": ["rag"],
+      "expect": {
+        "k": 5,
+        "reference": "大致是:构建过滤条件 → 查询向量化 → 向量召回与 BM25 召回 → 分数归一化与加权融合 → 可选重排 → 截断到 topK。"
+      }
+    },
+    {
+      "id": "gen-core-convention",
+      "query": "core 包能不能直接依赖数据库实现",
+      "tags": ["convention"],
+      "expect": {
+        "k": 5,
+        "reference": "不能。core 是纯抽象库,只定义端口接口,具体实现由外层通过依赖注入传入,core 不依赖基础设施。"
+      }
+    },
+    {
+      "id": "gen-mcp-fallback",
+      "query": "MCP 远端服务连不上时会怎样",
+      "tags": ["mcp"],
+      "expect": {
+        "k": 5,
+        "reference": "会走兜底降级路径:使用缓存的工具列表继续提供服务,并对失败的服务进入冷却期,避免反复重试拖慢会话。"
+      }
+    },
+    {
+      "id": "gen-unanswerable-cooking",
+      "query": "红烧肉要炖多长时间",
+      "tags": ["negative"],
+      "expect": {
+        "k": 5,
+        "reference": "资料中没有相关内容,应回答无法根据已有资料作答。",
+        "answer_contains": ["无法回答"]
+      }
+    },
+    {
+      "id": "gen-unanswerable-price",
+      "query": "这个项目的商业授权价格是多少",
+      "tags": ["negative"],
+      "expect": {
+        "k": 5,
+        "reference": "资料中没有价格信息,应回答无法根据已有资料作答。",
+        "answer_contains": ["无法回答"]
+      }
+    }
+  ]
+}

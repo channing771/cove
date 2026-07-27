@@ -160,8 +160,33 @@ bm25-heavy 相对 balanced,**带配对自助 95% 置信区间**:
 
 **门禁**:`go test ./internal/eval/rag/ -tags eval -run TestRAGGate -v`(参考 `rag_gate_test.go`)。
 
-**生成层忠实度**(答案是否被检索上下文支撑/答案正确性)不在本包:RAG 经 `knowledge_search`
-工具交付,端到端质量由 agent 评测(agent + 该工具)承接。
+### 生成层评测(faithfulness / 有无幻觉)
+
+检索指标只能证明"找对了资料",证明不了"答得对、没幻觉"。生成层由 `GenerationRunner`
+(检索 → 生成)+ `GenScorer` 承接,同样产出 `eval.Report`:
+
+| 打分器 | 判什么 | 期望键 |
+|---|---|---|
+| `Faithfulness` | 答案是否**完全由检索上下文支撑**(有无幻觉)——RAG 生成层的底线 | 无(恒执行) |
+| `AnswerRelevance` | 是否切题回应了问题(与事实对错正交) | 无 |
+| `AnswerCorrectness` | 对照参考答案是否正确完整 | `reference` |
+| `AnswerContains` | 关键事实子串硬断言,**无需 LLM、零成本** | `answer_contains` |
+
+`GenerationRecord` 内嵌 `RetrievalRecord`,使检索与生成指标能在同一次运行里一起看——
+检索没召回到证据时,生成不忠实往往是检索的锅,分开跑就归因不了。
+
+真实端到端(见 `TestRealDataGenerationEval`,GLM 检索 + `glm-4-flash` 生成与评审,
+10 条用例含 2 条"资料里没有"的问题):**faithfulness 10/10、answer_relevance 10/10、
+answer_correctness 10/10,pass_rate 100%**。
+
+> **一个必须避开的陷阱**:首版 rubric 把"根据已有资料无法回答"判成不忠实(score=0)——
+> 而这恰恰是**最理想的无幻觉行为**。照这样的评测调优,会把模型往编造答案的方向推。
+> 现已在代码层面确定性识别弃答(`GenJudge.AbstentionMarkers`,不作断言即无幻觉,直接满分,
+> 也省掉一次评审调用),并在两个 rubric 里补了对应条款。修复后 faithfulness 由 8/10 → 10/10。
+
+**注意:生成层不可复现**。评审与生成都走 LLM,同一输入的评分会小幅波动(实测
+answer_correctness 0.85↔0.89),因此生成层用**阈值门禁**(如 faithfulness 通过率 ≥80%)
+而非精确基线比对;确定性的 `AnswerContains` 可用于关键事实的硬门禁。
 
 ### 真实数据评测(-tags ragreal)
 
