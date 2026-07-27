@@ -1,0 +1,29 @@
+{
+  "dataset": "retrieval",
+  "pass_rate": 1,
+  "cases": [
+    {
+      "case_id": "q-vector",
+      "passed": true,
+      "scores": [
+        {"scorer": "recall_at_k", "passed": true, "value": 1},
+        {"scorer": "precision_at_k", "passed": true, "value": 0.4},
+        {"scorer": "hit_rate", "passed": true, "value": 1},
+        {"scorer": "mrr", "passed": true, "value": 1},
+        {"scorer": "ndcg", "passed": true, "value": 0.9197}
+      ]
+    },
+    {
+      "case_id": "q-rerank",
+      "passed": true,
+      "scores": [
+        {"scorer": "recall_at_k", "passed": true, "value": 1},
+        {"scorer": "precision_at_k", "passed": true, "value": 0.5},
+        {"scorer": "hit_rate", "passed": true, "value": 1},
+        {"scorer": "mrr", "passed": true, "value": 1},
+        {"scorer": "ndcg", "passed": true, "value": 1}
+      ]
+    }
+  ],
+  "scorers": {}
+}

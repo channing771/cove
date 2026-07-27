@@ -19,10 +19,7 @@ func (e *Evaluator) Run(ctx context.Context, ds *Dataset) (*Report, error) {
 	if e.Runner == nil {
 		return nil, errors.New("eval: nil runner")
 	}
-	rep := &Report{Dataset: ds.Name, Scorers: map[string]ScorerAgg{}}
-	valueSum := map[string]float64{}
-	valueCount := map[string]int{}
-
+	cases := make([]CaseResult, 0, len(ds.Cases))
 	for _, c := range ds.Cases {
 		record, err := e.Runner.Run(ctx, c)
 		if err != nil {
@@ -37,53 +34,11 @@ func (e *Evaluator) Run(ctx context.Context, ds *Dataset) (*Report, error) {
 			CostUSD:     record.Usage.CostUSD,
 			StopReason:  record.StopReason(),
 			Answer:      record.Answer(),
-			Passed:      true,
 		}
 		for _, s := range e.Scorers {
-			score := s.Score(ctx, c, record)
-			if score.Err != nil && score.ErrText == "" {
-				score.ErrText = score.Err.Error()
-			}
-			cr.Scores = append(cr.Scores, score)
-
-			agg := rep.Scorers[score.Scorer]
-			agg.Scorer = score.Scorer
-			agg.Runs++
-			switch {
-			case score.Err != nil:
-				agg.Errored++
-				cr.Passed = false
-			case score.Skipped:
-				agg.Skipped++
-			case score.Passed:
-				agg.Passed++
-				valueSum[score.Scorer] += score.Value
-				valueCount[score.Scorer]++
-			default:
-				agg.Failed++
-				cr.Passed = false
-				valueSum[score.Scorer] += score.Value
-				valueCount[score.Scorer]++
-			}
-			rep.Scorers[score.Scorer] = agg
+			cr.Scores = append(cr.Scores, s.Score(ctx, c, record))
 		}
-		rep.Cases = append(rep.Cases, cr)
+		cases = append(cases, cr)
 	}
-
-	for name, agg := range rep.Scorers {
-		if valueCount[name] > 0 {
-			agg.MeanValue = valueSum[name] / float64(valueCount[name])
-			rep.Scorers[name] = agg
-		}
-	}
-	if len(rep.Cases) > 0 {
-		passed := 0
-		for _, cr := range rep.Cases {
-			if cr.Passed {
-				passed++
-			}
-		}
-		rep.PassRate = float64(passed) / float64(len(rep.Cases))
-	}
-	return rep, nil
+	return Aggregate(ds.Name, cases), nil
 }

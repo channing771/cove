@@ -43,6 +43,66 @@ type Report struct {
 	Scorers  map[string]ScorerAgg `json:"scorers"`
 }
 
+// Aggregate 从各用例已填充的 Scores 计算通过态与聚合,产出完整 Report。
+//
+// 供任意 Runner/记录类型的评估器复用(agent 评测与 RAG 评测共用):调用方只需把每条用例
+// 打好分的 CaseResult(Scores 已填,摘要字段按需填)传入,由本函数统一判定 cr.Passed、
+// 每 scorer 的通过/失败/跳过/错误计数与均值、以及整体 pass rate。
+//
+// 判定约定:一条用例内任一 Score 出错或失败 → 该用例失败;跳过不影响通过态,也不计入均值。
+func Aggregate(dataset string, cases []CaseResult) *Report {
+	rep := &Report{Dataset: dataset, Scorers: map[string]ScorerAgg{}}
+	valueSum := map[string]float64{}
+	valueCount := map[string]int{}
+	for _, cr := range cases {
+		casePassed := true
+		for i := range cr.Scores {
+			s := &cr.Scores[i]
+			if s.Err != nil && s.ErrText == "" {
+				s.ErrText = s.Err.Error()
+			}
+			agg := rep.Scorers[s.Scorer]
+			agg.Scorer = s.Scorer
+			agg.Runs++
+			switch {
+			case s.Err != nil:
+				agg.Errored++
+				casePassed = false
+			case s.Skipped:
+				agg.Skipped++
+			case s.Passed:
+				agg.Passed++
+				valueSum[s.Scorer] += s.Value
+				valueCount[s.Scorer]++
+			default:
+				agg.Failed++
+				casePassed = false
+				valueSum[s.Scorer] += s.Value
+				valueCount[s.Scorer]++
+			}
+			rep.Scorers[s.Scorer] = agg
+		}
+		cr.Passed = casePassed
+		rep.Cases = append(rep.Cases, cr)
+	}
+	for name, agg := range rep.Scorers {
+		if valueCount[name] > 0 {
+			agg.MeanValue = valueSum[name] / float64(valueCount[name])
+			rep.Scorers[name] = agg
+		}
+	}
+	if len(rep.Cases) > 0 {
+		passed := 0
+		for _, cr := range rep.Cases {
+			if cr.Passed {
+				passed++
+			}
+		}
+		rep.PassRate = float64(passed) / float64(len(rep.Cases))
+	}
+	return rep
+}
+
 // WriteJSON 以缩进 JSON 写出报告。
 func (r *Report) WriteJSON(w io.Writer) error {
 	enc := json.NewEncoder(w)

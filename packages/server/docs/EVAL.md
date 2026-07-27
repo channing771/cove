@@ -69,6 +69,40 @@ _, _ = h.Run(ctx, react.Input{Query: "..."})
 // 回放:HarnessRunner 见 Case.Cassette 非空即自动走 DeterminismReplay,无需网络
 ```
 
+## RAG 检索评测(internal/eval/rag)
+
+RAG 模块的核心产出是**检索**,故单独评测检索质量(SUT 是检索器,不是整个 agent)。复用
+本包的数据集/报告/回归门禁,新增检索专用 Runner 与 IR 指标打分器。
+
+```go
+runner := &rag.RetrievalRunner{Retriever: myRetriever, TopK: 5}
+e := &rag.Evaluator{Runner: runner, Scorers: []rag.Scorer{
+    rag.RecallAtK(), rag.PrecisionAtK(), rag.HitRate(), rag.MRR(), rag.NDCG(),
+    // rag.ContextRelevance{Client: judgeClient}, // 可选 LLM-judge,无需 golden
+}}
+ds, _ := eval.LoadDataset("path/to/retrieval.json")
+rep, _ := e.Run(ctx, ds)           // 产出的是同一个 eval.Report,可 Diff/WriteJSON/门禁
+```
+
+**接真实检索器**:`ragadapter.SearcherRetriever{Searcher: svcCtx.RAGSearcher, Embedder: embClient, Filter: fenceFilter}` 把生产 `ragsearch.Searcher` 桥成 `rag.Retriever`(`Filter` 用来把检索限定在评测语料,如某测试 user_id/kb_id)。hermetic 单测用 fake `Retriever`。
+
+**数据集**:每条用例的 `expect` 带 golden 标注与阈值:
+| 键 | 含义 |
+|---|---|
+| `relevant_ids` | golden 相关文档/chunk 身份数组(缺失则所有指标跳过) |
+| `match_on` | `doc`(默认,按 `Source.SourceID`)或 `chunk`(按 chunk id) |
+| `k` | 截断的 top-k(覆盖 runner 的 TopK) |
+| `recall_min`/`precision_min`/`hit_min`/`mrr_min`/`ndcg_min` | 各指标通过阈值(缺省 0=只记录不 gate) |
+
+**指标**(确定性、无 LLM,均归一化到 0..1):`RecallAtK`、`PrecisionAtK`、`HitRate@k`、
+`MRR`(首个相关命中的倒数排名)、`NDCG@k`(二值相关度归一化折损累计增益)。**要让回归门禁
+抓到检索质量跌落**,数据集需为关键用例设 `*_min` 阈值——指标跌破阈值即 pass→fail,`Diff` 才捕获。
+
+**门禁**:`go test ./internal/eval/rag/ -tags eval -run TestRAGGate -v`(参考 `rag_gate_test.go`)。
+
+**生成层忠实度**(答案是否被检索上下文支撑/答案正确性)不在本包:RAG 经 `knowledge_search`
+工具交付,端到端质量由 agent 评测(agent + 该工具)承接。
+
 ## 二期:线上生产评估(暂缓,设计留档)
 
 复用同一 `eval.Scorer` 接口对真实运行(经 harness user-hook 捕获 `react.Result`)打分,

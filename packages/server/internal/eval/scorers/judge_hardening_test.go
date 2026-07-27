@@ -22,14 +22,14 @@ func TestLLMJudgeIgnoresTrailingBraces(t *testing.T) {
 
 // 字符串字面量内含大括号,不影响平衡计数。
 func TestFirstJSONObjectHandlesBracesInString(t *testing.T) {
-	obj, ok := firstJSONObject(`前言 {"reason":"包含 } 和 { 的文本","score":1} 尾巴`)
+	obj, ok := eval.FirstJSONObject(`前言 {"reason":"包含 } 和 { 的文本","score":1} 尾巴`)
 	if !ok || obj != `{"reason":"包含 } 和 { 的文本","score":1}` {
 		t.Fatalf("obj = %q ok=%v", obj, ok)
 	}
 }
 
 func TestFirstJSONObjectNone(t *testing.T) {
-	if _, ok := firstJSONObject("no braces here"); ok {
+	if _, ok := eval.FirstJSONObject("no braces here"); ok {
 		t.Fatal("want false when no object")
 	}
 }
