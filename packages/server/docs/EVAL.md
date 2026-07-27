@@ -35,7 +35,13 @@ rep.WriteTable(os.Stdout)
 
 ## CI 回归门禁
 
-用 build tag `eval` 的测试载入数据集 + 基线,跑 `eval.AssertNoRegression`:
+用 build tag `eval` 的测试载入数据集 + 基线,用 `Report.Diff(baseline).Err()` 判回归
+(报告层不依赖 `testing`,由测试侧决定 `t.Fatal`/退出码):
+
+```go
+if err := current.Diff(baseline).Err(); err != nil { t.Fatal(err) }
+```
+
 
 ```bash
 go test ./internal/eval/ -tags eval -run TestEvalGate -v

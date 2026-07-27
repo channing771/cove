@@ -2,10 +2,11 @@ package eval
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
-	"testing"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -124,11 +125,23 @@ func (r *Report) Diff(baseline *Report) *RegressionReport {
 	return out
 }
 
-// AssertNoRegression 在有相对基线的新失败时使测试失败。
-func AssertNoRegression(t testing.TB, current, baseline *Report) {
-	t.Helper()
-	reg := current.Diff(baseline)
-	for _, f := range reg.NewFailures {
-		t.Errorf("regression: case %q scorer %q now fails (%s)", f.CaseID, f.Scorer, f.Detail)
+// Failed 表示存在相对基线的新失败。
+func (rr *RegressionReport) Failed() bool { return rr != nil && len(rr.NewFailures) > 0 }
+
+// Err 汇总所有新失败为一个错误;无回归时返回 nil。
+//
+// 供 CI 门禁使用:if err := current.Diff(baseline).Err(); err != nil { t.Fatal(err) }。
+// 报告层不引入 testing 依赖,由调用方决定如何失败(t.Fatal/日志/退出码)。
+func (rr *RegressionReport) Err() error {
+	if !rr.Failed() {
+		return nil
 	}
+	var b strings.Builder
+	for i, f := range rr.NewFailures {
+		if i > 0 {
+			b.WriteString("; ")
+		}
+		fmt.Fprintf(&b, "regression: case %q scorer %q now fails (%s)", f.CaseID, f.Scorer, f.Detail)
+	}
+	return errors.New(b.String())
 }

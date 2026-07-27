@@ -56,7 +56,9 @@ func TestEvalGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load baseline: %v", err)
 	}
-	eval.AssertNoRegression(t, rep, baseline)
+	if err := rep.Diff(baseline).Err(); err != nil {
+		t.Error(err)
+	}
 	if rep.PassRate != 1 {
 		t.Fatalf("pass rate = %v, want 1", rep.PassRate)
 	}
