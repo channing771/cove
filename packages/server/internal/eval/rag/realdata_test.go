@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -40,12 +41,68 @@ import (
 )
 
 const (
-	evalCollection = "cove_eval_chunks"
-	embeddingDim   = 512
-	// lowRelevanceThreshold 由实测校准:域内查询的最高向量分显著高于域外查询,
+	// lowRelevanceThreshold 由实测校准:域内查询的最高向量分应显著高于域外查询,
 	// 取二者之间的分界。运行测试会打印每条用例的 max_score 供重新校准。
-	lowRelevanceThreshold = 0.0
+	// 词形 HashEmbedder 下两者区间重叠、无可分阈值(取 0 即不触发);GLM 语义向量下
+	// 由 glmLowRelevanceThreshold 生效。
+	lowRelevanceThreshold    = 0.0
+	glmLowRelevanceThreshold = 0.0
 )
+
+// embedderSetup 描述本次评测使用的向量模型及其配套的隔离参数。
+//
+// 不同嵌入模型的向量维度与语义空间都不同,必须各自使用独立的 collection/index 与基线,
+// 否则会互相污染(维度不匹配直接写入失败,或用旧向量算出无意义的指标)。
+type embedderSetup struct {
+	name       string
+	embedder   corpus.BatchEmbedderQuerier
+	dim        int
+	collection string
+	baseline   string
+	lowThresh  float64
+}
+
+// resolveEmbedder 按环境变量选择向量模型:
+//
+//	GLM_API_KEY(或 ZHIPU_API_KEY)存在 → GLM embedding-3(真实语义向量)
+//	否则                              → 确定性 HashEmbedder(词形,离线可复现)
+//
+// 可选 env:GLM_EMBEDDING_MODEL、GLM_BASE_URL、GLM_EMBEDDING_DIM。
+func resolveEmbedder(t *testing.T) embedderSetup {
+	t.Helper()
+	apiKey := env("GLM_API_KEY", os.Getenv("ZHIPU_API_KEY"))
+	if apiKey == "" {
+		return embedderSetup{
+			name:       "hash(词形,离线)",
+			embedder:   corpus.NewHashEmbedder(512),
+			dim:        512,
+			collection: "cove_eval_chunks",
+			baseline:   filepath.Join("testdata", "baselines", "cove-docs.json"),
+			lowThresh:  lowRelevanceThreshold,
+		}
+	}
+	dim := 1024
+	if v := os.Getenv("GLM_EMBEDDING_DIM"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil || parsed <= 0 {
+			t.Fatalf("GLM_EMBEDDING_DIM 非法: %q", v)
+		}
+		dim = parsed
+	}
+	model := env("GLM_EMBEDDING_MODEL", corpus.GLMEmbeddingModel)
+	embedder, err := corpus.NewGLMEmbedder(apiKey, model, os.Getenv("GLM_BASE_URL"), dim)
+	if err != nil {
+		t.Fatalf("构造 GLM 嵌入器失败: %v", err)
+	}
+	return embedderSetup{
+		name:       fmt.Sprintf("GLM %s(语义,dim=%d)", model, dim),
+		embedder:   embedder,
+		dim:        dim,
+		collection: fmt.Sprintf("cove_eval_chunks_glm_%d", dim),
+		baseline:   filepath.Join("testdata", "baselines", "cove-docs-glm.json"),
+		lowThresh:  glmLowRelevanceThreshold,
+	}
+}
 
 // corpusDir 是冻结的语料快照目录(仓库真实中文技术文档的副本)。
 //
@@ -86,52 +143,24 @@ func env(key, def string) string {
 
 func TestRealDataRetrievalEval(t *testing.T) {
 	ctx := context.Background()
+	setup := resolveEmbedder(t)
+	t.Logf("向量模型: %s | collection=%s | 基线=%s", setup.name, setup.collection, setup.baseline)
 
-	// --- 真实存储 ---
-	dense, err := qdrant.NewDenseIndex(env("QDRANT_ADDR", "localhost:6334"), "", false, evalCollection)
-	if err != nil {
-		t.Fatalf("qdrant: %v (是否已起 cove-eval-qdrant?)", err)
-	}
-	esClient, err := es.NewClient(es.Config{URL: env("ES_URL", "http://localhost:9200")})
-	if err != nil {
-		t.Fatalf("es client: %v (是否已起 cove-eval-es?)", err)
-	}
-	keyword := es.NewKeywordIndex(esClient, evalCollection)
-
-	// 先清空存储再灌:ES 的 BM25 IDF 统计会把"已删除但未段合并"的文档计入,
-	// 反复 delete+reindex 会让词项统计逐轮漂移,进而改变融合排序。只有从干净索引
-	// 开始,评测结果才可复现、阈值门禁才不抖动。
-	resetStores(t)
-
-	// --- 真实语料 → 生产分块 → 嵌入 → 生产双写 ---
-	docs, err := corpus.LoadFiles(corpusPaths(), corpus.LoadOptions{UserID: evalUser, Root: corpusDir})
-	if err != nil {
-		t.Fatalf("load corpus: %v", err)
-	}
-	if len(docs) != len(corpusFiles) {
-		t.Fatalf("loaded %d docs, want %d", len(docs), len(corpusFiles))
-	}
-	embedder := corpus.NewHashEmbedder(embeddingDim)
-	ingester := &corpus.Ingester{Dense: dense, Keyword: keyword, Embedder: embedder, Dim: embeddingDim}
-	chunks, err := ingester.Ingest(ctx, docs)
-	if err != nil {
-		t.Fatalf("ingest: %v", err)
-	}
-	t.Logf("已把 %d 篇真实文档灌入 Qdrant+ES,共 %d 个 chunk", len(docs), chunks)
-	waitSearchable(ctx, t, keyword)
+	dense, keyword := openStores(t, setup)
+	resetStores(t, setup)
+	ingestCorpus(ctx, t, setup, dense, keyword)
 
 	// --- 真实检索链路 ---
 	repo := ragchunk.NewRepository(dense, keyword)
 	searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
-		ragsearch.WithEmbeddingDim(embeddingDim),
-		ragsearch.WithEmbedder(embedder),
-		// 低相关阈值:按实测的向量分分布校准(见 lowRelevanceThreshold 注释),
-		// 使域外问题被判为低相关,域内问题不被误判。
-		ragsearch.WithLowRelevanceThreshold(lowRelevanceThreshold),
+		ragsearch.WithEmbeddingDim(setup.dim),
+		ragsearch.WithEmbedder(setup.embedder),
+		// 低相关阈值:按实测的向量分分布校准,使域外问题被判为低相关、域内不被误判。
+		ragsearch.WithLowRelevanceThreshold(setup.lowThresh),
 		ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
 	retriever := ragadapter.SearcherRetriever{
 		Searcher: searcher,
-		Embedder: embedder,
+		Embedder: setup.embedder,
 		Filter:   vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}},
 	}
 
@@ -181,13 +210,13 @@ func TestRealDataRetrievalEval(t *testing.T) {
 	}
 	t.Logf("pass_rate = %.2f%%", rep.PassRate*100)
 
-	reportPath := filepath.Join("testdata", "reports", "cove-docs.json")
+	reportPath := filepath.Join("testdata", "reports", filepath.Base(setup.baseline))
 	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
 		t.Fatalf("mkdir reports: %v", err)
 	}
 	writeJSON(t, reportPath, rep)
 
-	baselinePath := filepath.Join("testdata", "baselines", "cove-docs.json")
+	baselinePath := setup.baseline
 	if os.Getenv("EVAL_WRITE_BASELINE") == "1" {
 		writeJSON(t, baselinePath, rep)
 		t.Logf("已写入基线 %s", baselinePath)
@@ -208,22 +237,23 @@ func TestRealDataRetrievalEval(t *testing.T) {
 //	go test ./internal/eval/rag/ -tags ragreal -run TestRealDataWeightComparison -v
 func TestRealDataWeightComparison(t *testing.T) {
 	ctx := context.Background()
-	dense, keyword, embedder := setupRealStores(ctx, t)
+	dense, keyword, setup := setupRealStores(ctx, t)
+	t.Logf("向量模型: %s", setup.name)
 	repo := ragchunk.NewRepository(dense, keyword)
 	filter := vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", evalUser.String())}}
 
 	// 每个变体是一套独立的融合权重(权重属构造级配置)。
 	newVariant := func(name string, vectorWeight, bm25Weight float64) rag.Variant {
 		searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
-			ragsearch.WithEmbeddingDim(embeddingDim),
-			ragsearch.WithEmbedder(embedder),
+			ragsearch.WithEmbeddingDim(setup.dim),
+			ragsearch.WithEmbedder(setup.embedder),
 			ragsearch.WithVectorWeight(vectorWeight),
 			ragsearch.WithBM25Weight(bm25Weight),
 			ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
 		return rag.Variant{
 			Name: name,
 			Runner: &rag.RetrievalRunner{
-				Retriever: ragadapter.SearcherRetriever{Searcher: searcher, Embedder: embedder, Filter: filter},
+				Retriever: ragadapter.SearcherRetriever{Searcher: searcher, Embedder: setup.embedder, Filter: filter},
 				TopK:      5,
 			},
 		}
@@ -266,36 +296,54 @@ func TestRealDataWeightComparison(t *testing.T) {
 }
 
 // setupRealStores 复位并灌入真实语料,返回可用于检索的存储与嵌入器。
-func setupRealStores(ctx context.Context, t *testing.T) (*qdrant.DenseIndex, *es.KeywordIndex, *corpus.HashEmbedder) {
+// openStores 连接真实 Qdrant 与 Elasticsearch(按 setup 隔离的 collection/index)。
+func openStores(t *testing.T, setup embedderSetup) (*qdrant.DenseIndex, *es.KeywordIndex) {
 	t.Helper()
-	dense, err := qdrant.NewDenseIndex(env("QDRANT_ADDR", "localhost:6334"), "", false, evalCollection)
+	dense, err := qdrant.NewDenseIndex(env("QDRANT_ADDR", "localhost:6334"), "", false, setup.collection)
 	if err != nil {
-		t.Fatalf("qdrant: %v", err)
+		t.Fatalf("qdrant: %v (是否已起 cove-eval-qdrant?)", err)
 	}
 	esClient, err := es.NewClient(es.Config{URL: env("ES_URL", "http://localhost:9200")})
 	if err != nil {
-		t.Fatalf("es client: %v", err)
+		t.Fatalf("es client: %v (是否已起 cove-eval-es?)", err)
 	}
-	keyword := es.NewKeywordIndex(esClient, evalCollection)
-	resetStores(t)
+	return dense, es.NewKeywordIndex(esClient, setup.collection)
+}
 
+// ingestCorpus 把冻结语料经生产链路灌入检索存储。
+func ingestCorpus(ctx context.Context, t *testing.T, setup embedderSetup, dense *qdrant.DenseIndex, keyword *es.KeywordIndex) {
+	t.Helper()
 	docs, err := corpus.LoadFiles(corpusPaths(), corpus.LoadOptions{UserID: evalUser, Root: corpusDir})
 	if err != nil {
 		t.Fatalf("load corpus: %v", err)
 	}
-	embedder := corpus.NewHashEmbedder(embeddingDim)
-	if _, err := (&corpus.Ingester{Dense: dense, Keyword: keyword, Embedder: embedder, Dim: embeddingDim}).Ingest(ctx, docs); err != nil {
+	if len(docs) != len(corpusFiles) {
+		t.Fatalf("loaded %d docs, want %d", len(docs), len(corpusFiles))
+	}
+	ingester := &corpus.Ingester{Dense: dense, Keyword: keyword, Embedder: setup.embedder, Dim: setup.dim}
+	chunks, err := ingester.Ingest(ctx, docs)
+	if err != nil {
 		t.Fatalf("ingest: %v", err)
 	}
+	t.Logf("已把 %d 篇真实文档灌入 Qdrant+ES,共 %d 个 chunk", len(docs), chunks)
 	waitSearchable(ctx, t, keyword)
-	return dense, keyword, embedder
+}
+
+// setupRealStores 复位并灌入语料,返回可用于检索的存储与嵌入器。
+func setupRealStores(ctx context.Context, t *testing.T) (*qdrant.DenseIndex, *es.KeywordIndex, embedderSetup) {
+	t.Helper()
+	setup := resolveEmbedder(t)
+	dense, keyword := openStores(t, setup)
+	resetStores(t, setup)
+	ingestCorpus(ctx, t, setup, dense, keyword)
+	return dense, keyword, setup
 }
 
 // resetStores 删除评测专用的 ES 索引与 Qdrant collection,使每次评测从干净状态开始。
 //
 // 二者随后会由 Ingester 的 EnsureIndex/EnsureCollection 重建。删除不存在的索引返回 404,
 // 属正常情形,不视为失败。
-func resetStores(t *testing.T) {
+func resetStores(t *testing.T, setup embedderSetup) {
 	t.Helper()
 	del := func(url string) {
 		req, err := http.NewRequest(http.MethodDelete, url, nil)
@@ -312,8 +360,8 @@ func resetStores(t *testing.T) {
 			t.Fatalf("delete %s: status %d", url, resp.StatusCode)
 		}
 	}
-	del(env("ES_URL", "http://localhost:9200") + "/" + evalCollection)
-	del(env("QDRANT_HTTP", "http://localhost:6333") + "/collections/" + evalCollection)
+	del(env("ES_URL", "http://localhost:9200") + "/" + setup.collection)
+	del(env("QDRANT_HTTP", "http://localhost:6333") + "/collections/" + setup.collection)
 }
 
 // waitSearchable 等 ES 刷新可见(近实时索引),避免刚写入就检索不到。

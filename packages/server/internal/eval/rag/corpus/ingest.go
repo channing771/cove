@@ -16,6 +16,15 @@ type BatchEmbedder interface {
 	Embed(ctx context.Context, texts []string, dimensions int) ([][]float64, error)
 }
 
+// BatchEmbedderQuerier 同时满足摄入侧批量嵌入与检索侧单条嵌入(ragsearch.Embedder)。
+//
+// 评测必须用同一个嵌入器灌库与查询——两侧模型不一致会让向量落在不同语义空间,
+// 检索结果失去意义。本接口把这个约束固化在类型上。
+type BatchEmbedderQuerier interface {
+	BatchEmbedder
+	EmbedOne(ctx context.Context, text string, dimensions int) ([]float64, error)
+}
+
 // Ingester 用生产链路把语料写入检索存储:
 // 真实分块器 ragchunker → 嵌入 → ragchunk.Repository 双写 DenseIndex + KeywordIndex。
 type Ingester struct {

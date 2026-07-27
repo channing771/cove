@@ -171,9 +171,38 @@ go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
 MRR **1.000**、nDCG **0.9866**、precision\@5 **0.5972**,pass\_rate 100%。阈值取实测值的
 保守下界写进数据集,使门禁能抓回归又不抖动。
 
-**嵌入**:默认用 `corpus.HashEmbedder`(字符 bigram 特征哈希 + L2 归一化)—— 无需 API key、
-完全可复现,配合 ES 的真实 BM25 通道即可产出有意义的混合排序;要评测真实模型的语义检索,
-把真实 `llm.Client` 注入 `Ingester.Embedder` 与 `SearcherRetriever.Embedder` 即可替换。
+#### 向量模型:GLM embedding-3(真实语义)或 HashEmbedder(离线)
+
+评测按环境变量自动选择向量模型,**摄入与检索始终用同一个**(类型上由
+`corpus.BatchEmbedderQuerier` 固化——两侧模型不一致会让向量落在不同语义空间,检索失去意义):
+
+```bash
+# 真实语义向量:GLM embedding-3
+export GLM_API_KEY=<你的智谱 key>          # 或 ZHIPU_API_KEY
+go test ./internal/eval/rag/ -tags ragreal -run TestRealDataRetrievalEval -v
+
+# 不设 key → 自动回退确定性 HashEmbedder(词形,离线可复现)
+```
+
+| env | 默认 | 说明 |
+|---|---|---|
+| `GLM_API_KEY` / `ZHIPU_API_KEY` | 空 | 有值即启用 GLM,否则回退 hash |
+| `GLM_EMBEDDING_MODEL` | `embedding-3` | 向量模型名 |
+| `GLM_EMBEDDING_DIM` | `1024` | embedding-3 支持 256/512/1024/2048 |
+| `GLM_BASE_URL` | `https://open.bigmodel.cn/api/paas/v4` | 可指向兼容网关 |
+
+GLM 的 `/embeddings` 与 OpenAI 同构,故直接复用仓库既有的 OpenAI 兼容客户端
+(`zhipu` 本就走 `OpenAICompatibleFactory`),**未新增 provider**;`corpus.ClientEmbedder`
+负责把 `llm.Client` 适配成评测所需的批量+单条嵌入接口,并按 `GLMEmbeddingBatchSize`
+切批(真实向量服务对单请求输入条数有上限)。
+
+**两种向量模型各自隔离**:collection/index 与基线文件均按嵌入器区分
+(`cove_eval_chunks` / `cove_eval_chunks_glm_<dim>`,`cove-docs.json` / `cove-docs-glm.json`),
+避免维度不匹配与指标互相污染。
+
+- `HashEmbedder`:字符 bigram 特征哈希 + L2 归一化,无需 API key、完全可复现,配合 ES 的
+  真实 BM25 通道即可产出有意义的混合排序;但只有词形信号,无法分辨域外问题(见下方负例局限)。
+- `GLM embedding-3`:真实语义向量,联网、有调用成本,指标随模型版本变化。
 
 **语料必须冻结**:语料是 `testdata/corpus/` 下的**快照**,不是直接读活文档。因为语料里含
 `docs/EVAL.md`,而记录这套评测本身就会改它——活文档一变,chunk 与检索结果随之变化,基线
