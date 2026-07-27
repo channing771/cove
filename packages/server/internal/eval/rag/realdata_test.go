@@ -255,6 +255,84 @@ func TestRealDataRetrievalEval(t *testing.T) {
 	}
 }
 
+// otherUser 是不拥有任何评测语料的租户,用于越权检索验证。
+var otherUser = corpus.DeterministicID("eval-user-other")
+
+// TestRealDataTenantIsolationGate 验证租户隔离:换一个 user_id 检索,必须一条都查不到。
+//
+// 这是**安全属性**而非质量指标——生产的 knowledge_search 始终按 user_id/kb_id 过滤,
+// 过滤一旦失效就是跨租户数据泄露。用例复用域内那批"确定能检索到内容"的查询:
+//   - 对照组(正确 user_id):必须有命中,证明语料确实在库、查询确实可召回;
+//   - 越权组(其他 user_id):必须零命中。
+//
+// 两组同时断言,才能区分"隔离生效"与"检索整体挂了"——只测越权组的话,检索全挂也会绿。
+//
+//	go test ./internal/eval/rag/ -tags ragreal -run TestRealDataTenantIsolationGate -v
+func TestRealDataTenantIsolationGate(t *testing.T) {
+	ctx := context.Background()
+	dense, keyword, setup := setupRealStores(ctx, t)
+	t.Logf("向量模型: %s", setup.name)
+
+	repo := ragchunk.NewRepository(dense, keyword)
+	searcher := ragsearch.NewSearcher[models.RAGChunkSource](dense, keyword,
+		ragsearch.WithEmbeddingDim(setup.dim),
+		ragsearch.WithEmbedder(setup.embedder),
+		ragsearch.WithSourceDecoder[models.RAGChunkSource](repo.DecodeSource))
+
+	retrieverFor := func(userID string) ragadapter.SearcherRetriever {
+		return ragadapter.SearcherRetriever{
+			Searcher: searcher,
+			Embedder: setup.embedder,
+			Filter:   vectorstore.Filter{Must: []vectorstore.Condition{vectorstore.Eq("user_id", userID)}},
+		}
+	}
+
+	ds, err := eval.LoadDataset("testdata/datasets/cove-docs.json")
+	if err != nil {
+		t.Fatalf("load dataset: %v", err)
+	}
+
+	// 对照组:正确租户必须有命中(否则说明是检索坏了,而不是隔离生效)。
+	control := &eval.Dataset{Name: "tenant-control", Cases: make([]eval.Case, 0, len(ds.Cases))}
+	// 越权组:其他租户必须零命中。
+	breach := &eval.Dataset{Name: "tenant-breach", Cases: make([]eval.Case, 0, len(ds.Cases))}
+	for _, c := range ds.Cases {
+		control.Cases = append(control.Cases, eval.Case{
+			ID: c.ID + "/own", Query: c.Query, Tags: []string{"tenant-control"},
+			Expect: map[string]any{"expect_no_results": false, "k": 5},
+		})
+		breach.Cases = append(breach.Cases, eval.Case{
+			ID: c.ID + "/cross-tenant", Query: c.Query, Tags: []string{"tenant-breach"},
+			Expect: map[string]any{"expect_no_results": true, "k": 5},
+		})
+	}
+
+	run := func(ds *eval.Dataset, userID string) *eval.Report {
+		e := &rag.Evaluator{
+			Runner:  &rag.RetrievalRunner{Retriever: retrieverFor(userID), TopK: 5},
+			Scorers: []rag.Scorer{rag.NoResults()},
+		}
+		rep, err := e.Run(ctx, ds)
+		if err != nil {
+			t.Fatalf("eval run: %v", err)
+		}
+		return rep
+	}
+
+	controlRep := run(control, evalUser.String())
+	breachRep := run(breach, otherUser.String())
+
+	t.Logf("对照组(自有租户,应有命中): pass_rate=%.2f%%", controlRep.PassRate*100)
+	t.Logf("越权组(其他租户,应零命中): pass_rate=%.2f%%", breachRep.PassRate*100)
+	if controlRep.PassRate != 1 {
+		t.Fatalf("对照组 pass_rate=%.2f%%,说明检索本身有问题,越权组结论不可信", controlRep.PassRate*100)
+	}
+	if breachRep.PassRate != 1 {
+		_ = breachRep.WriteTable(logWriter{t})
+		t.Errorf("越权检索泄露:pass_rate=%.2f%%,应为 100%%", breachRep.PassRate*100)
+	}
+}
+
 // TestRealDataNegativeGate 用负例数据集验证:知识库外的问题必须被判为低相关。
 //
 // 仅在使用真实语义向量(GLM)时有意义并执行——词形 HashEmbedder 下域内/域外分数区间
