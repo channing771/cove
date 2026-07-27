@@ -2,6 +2,7 @@ package eval
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/boxify/api-go/internal/core/agent/harness"
@@ -29,6 +30,9 @@ type HarnessRunner struct {
 // Run 跑一条用例:注入 usage 捕获与可选回放,计时执行,组装 RunRecord。
 // agent 运行错误落入 RunRecord.Err;返回的 error 仅用于基础设施级失败。
 func (r *HarnessRunner) Run(ctx context.Context, c Case) (RunRecord, error) {
+	if r.Client == nil {
+		return RunRecord{}, errors.New("eval: HarnessRunner.Client is nil")
+	}
 	client, usage := wrapUsage(r.Client, r.Cost)
 
 	opts := make([]harness.Option, 0, len(r.Options)+2)

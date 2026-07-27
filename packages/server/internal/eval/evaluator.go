@@ -1,6 +1,9 @@
 package eval
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Evaluator 用一组打分器在数据集上评估一个 Runner。
 type Evaluator struct {
@@ -10,6 +13,12 @@ type Evaluator struct {
 
 // Run 串行跑完数据集,逐用例调 Runner 与全部 Scorer,聚合成 Report。
 func (e *Evaluator) Run(ctx context.Context, ds *Dataset) (*Report, error) {
+	if ds == nil {
+		return nil, errors.New("eval: nil dataset")
+	}
+	if e.Runner == nil {
+		return nil, errors.New("eval: nil runner")
+	}
 	rep := &Report{Dataset: ds.Name, Scorers: map[string]ScorerAgg{}}
 	valueSum := map[string]float64{}
 	valueCount := map[string]int{}
