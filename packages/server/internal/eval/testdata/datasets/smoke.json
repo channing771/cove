@@ -1,0 +1,17 @@
+{
+  "name": "smoke",
+  "cases": [
+    {
+      "id": "greet-basic",
+      "query": "用一句话解释什么是向量数据库",
+      "tags": ["knowledge"],
+      "expect": {
+        "contains": ["向量"],
+        "max_iterations": 2,
+        "stop_reason": "final_answer",
+        "latency_ms": 60000
+      },
+      "cassette": "../cassettes/greet-basic.json"
+    }
+  ]
+}
